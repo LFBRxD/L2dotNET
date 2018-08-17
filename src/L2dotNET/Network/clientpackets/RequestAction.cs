@@ -1,7 +1,10 @@
-﻿using L2dotNET.model.player;
-using L2dotNET.world;
-using log4net;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.World;
+using L2dotNET.Models;
+using L2dotNET.Models.Player;
 using L2dotNET.Utility;
+using NLog;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -14,9 +17,9 @@ namespace L2dotNET.Network.clientpackets
         private readonly int _z;
         private readonly int _actionId;
 
-        private static readonly ILog Log = LogManager.GetLogger(typeof(RequestAction));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        public RequestAction(Packet packet, GameClient client)
+        public RequestAction(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _objectId = packet.ReadInt();
@@ -26,41 +29,43 @@ namespace L2dotNET.Network.clientpackets
             _actionId = packet.ReadByte(); // Action identifier : 0-Simple click, 1-Shift click
         }
 
-       
-
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            
-            L2Player player = _client.CurrentPlayer;
-
-            L2Object obj = null;
-
-            if (_objectId == player.ObjId)
-                obj = player;
-            else
+            await Task.Run(() =>
             {
-                if (L2World.Instance.GetObject(_objectId) != null)
-                    obj = L2World.Instance.GetObject(_objectId);
-            }
-            //fixed nullreference exception when obj is null
-            Log.Debug($"Action Requested with { Utilz.GetTypeLower(obj).ToString() }  of ID : { _objectId.ToString()}");
+                L2Player player = _client.CurrentPlayer;
+                L2Object obj = null;
 
-            if(obj==null)
-            {
-                Log.Debug("Action Requested Failed");
-                player.SendActionFailed();
-                return;
-            }
+                if (_objectId == player.ObjectId)
+                    obj = player;
+                else
+                {
+                    if (L2World.GetObject(_objectId) != null)
+                        obj = L2World.GetObject(_objectId);
+                }
+                //fixed nullreference exception when obj is null
+                Log.Debug($"Action Requested with { Utilz.GetTypeLower(obj).ToString() }  of ID : { _objectId.ToString()}");
 
-            switch (_actionId)
-            {
-                case 0:
-                    obj.OnAction(player);
-                    break;
-                case 1:
-                    obj.OnActionShift(player);
-                    break;
-            }
+                if(obj==null)
+                {
+                    Log.Debug("Action Requested Failed");
+                    player.SendActionFailedAsync();
+                    return;
+                }
+
+                switch (_actionId)
+                {
+                    case 0:
+                        obj.OnActionAsync(player);
+                        break;
+                    case 1:
+                        obj.OnActionShiftAsync(player);
+                        break;
+                    default:
+                        player.SendActionFailedAsync();
+                        break;
+                }
+            });
         }
     }
 }

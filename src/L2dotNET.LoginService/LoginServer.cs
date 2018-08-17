@@ -1,35 +1,39 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
-using log4net;
+using System.Threading.Tasks;
 using L2dotNET.LoginService.GSCommunication;
 using L2dotNET.LoginService.Managers;
-using Ninject;
+using Microsoft.Extensions.DependencyInjection;
+using NLog;
 
 namespace L2dotNET.LoginService
 {
     class LoginServer
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(LoginServer));
-
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
+        public static IServiceProvider ServiceProvider;
         private TcpListener _listener;
 
-        public static IKernel Kernel { get; set; }
-
-        public void Start()
+        public LoginServer(IServiceProvider serviceProvider)
         {
-            CheckRunningProcesses();
+            ServiceProvider = serviceProvider;
+        }
 
-            Config.Config.Instance.Initialize();
-            PreReqValidation.Instance.Initialize();
-            ClientManager.Instance.Initialize();
-            ServerThreadPool.Instance.Initialize();
+        public async void Start()
+        {
+            Config.Config config = ServiceProvider.GetService<Config.Config>();
+            ServerThreadPool serverThreadPool = ServiceProvider.GetService<ServerThreadPool>();
+
+            await config.Initialise();
+            await ServiceProvider.GetService<PreReqValidation>().Initialise();
+            await ServiceProvider.GetService<Managers.ClientManager>().Initialise();
+            await serverThreadPool.Initialize();
+
             NetworkRedirect.Instance.Initialize();
 
-            _listener = new TcpListener(IPAddress.Parse(Config.Config.Instance.ServerConfig.Host), Config.Config.Instance.ServerConfig.LoginPort);
+            _listener = new TcpListener(IPAddress.Parse(config.ServerConfig.Host), config.ServerConfig.LoginPort);
 
             try
             {
@@ -43,43 +47,29 @@ namespace L2dotNET.LoginService
                 Environment.Exit(0);
             }
 
-            Log.Info($"Auth server listening clients at {Config.Config.Instance.ServerConfig.Host}:{Config.Config.Instance.ServerConfig.LoginPort}");
-            new Thread(ServerThreadPool.Instance.Start).Start();
+            Log.Info($"Auth server listening clients at {config.ServerConfig.Host}:{config.ServerConfig.LoginPort}");
+
+            Task.Factory.StartNew(serverThreadPool.Start);
 
             WaitForClients();
         }
 
-        private void WaitForClients()
+        private async void WaitForClients()
         {
-            _listener.BeginAcceptTcpClient(OnClientConnected, null);
+            while (true)
+            {
+                TcpClient client = await _listener.AcceptTcpClientAsync();
+#pragma warning disable 4014
+                Task.Factory.StartNew(() => AcceptClient(client));
+#pragma warning restore 4014
+            }
         }
 
-        private void OnClientConnected(IAsyncResult asyncResult)
+        private void AcceptClient(TcpClient client)
         {
-            TcpClient clientSocket = _listener.EndAcceptTcpClient(asyncResult);
+            Log.Debug($"Received connection request from: {client.Client.RemoteEndPoint}");
 
-            Log.Info($"Received connection request from: {clientSocket.Client.RemoteEndPoint}");
-
-            AcceptClient(clientSocket);
-
-            WaitForClients();
-        }
-
-        /// <summary>Handle Client Request</summary>
-        private void AcceptClient(TcpClient clientSocket)
-        {
-            ClientManager.Instance.AddClient(clientSocket);
-        }
-
-        private void CheckRunningProcesses()
-        {
-            if (Process.GetProcessesByName("L2dotNET.LoginService").Length == 1)
-                return;
-
-            Log.Fatal("A L2dotNET.LoginService process is already running!");
-            Log.Info("Press ENTER to exit...");
-            Console.Read();
-            Environment.Exit(0);
+            ServiceProvider.GetService<Managers.ClientManager>().AddClient(client);
         }
     }
 }

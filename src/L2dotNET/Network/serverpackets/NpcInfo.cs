@@ -1,4 +1,4 @@
-﻿using L2dotNET.model.npcs;
+﻿using L2dotNET.Models.Npcs;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -14,9 +14,9 @@ namespace L2dotNET.Network.serverpackets
         public override void Write()
         {
             WriteByte(0x16);
-            WriteInt(_npc.ObjId);
+            WriteInt(_npc.ObjectId);
             WriteInt(_npc.NpcHashId);
-            WriteInt(1/*_npc.Attackable*/);
+            WriteInt(_npc.Attackable);
             WriteInt(_npc.X);
             WriteInt(_npc.Y);
             WriteInt(_npc.Z);
@@ -48,7 +48,7 @@ namespace L2dotNET.Network.serverpackets
             WriteInt(0);
             WriteInt(_npc.Template.LHand); // left hand weapon
             WriteByte(1); // name above char 1=true ... ??
-            WriteByte(_npc.isRunning());
+            WriteByte(_npc.IsRunning());
             WriteByte(_npc.isInCombat() ? 1 : 0);
             WriteByte(_npc.IsAlikeDead());
             WriteByte(_npc.Summoned ? 2 : 0); // invisible ?? 0=false  1=true   2=summoned (only works if model has a summon animation)

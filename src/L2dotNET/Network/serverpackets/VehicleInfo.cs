@@ -1,4 +1,4 @@
-﻿using L2dotNET.model.vehicles;
+﻿using L2dotNET.Models.Vehicles;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -14,7 +14,7 @@ namespace L2dotNET.Network.serverpackets
         public override void Write()
         {
             WriteByte(0x59);
-            WriteInt(_boat.ObjId);
+            WriteInt(_boat.ObjectId);
             WriteInt(_boat.X);
             WriteInt(_boat.Y);
             WriteInt(_boat.Z);

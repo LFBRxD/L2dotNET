@@ -1,108 +1,81 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.Sockets;
-using log4net;
+using System.Threading.Tasks;
 using L2Crypt;
 using L2dotNET.LoginService.Network;
+using L2dotNET.Utility;
+using NLog;
 
 namespace L2dotNET.LoginService.Managers
 {
-    sealed class ClientManager
+    public sealed class ClientManager : IInitialisable
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(ClientManager));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
+        public bool Initialised { get; private set; }
 
-        private static volatile ClientManager _instance;
-        private static readonly object SyncRoot = new object();
         private const int ScrambleCount = 1;
-        private ScrambledKeyPair[] _scrambledPairs;
         private const int BlowfishCount = 20;
+
+        private ScrambledKeyPair[] _scrambledPairs;
         private byte[][] _blowfishKeys;
 
-        private readonly List<LoginClient> _loggedClients = new List<LoginClient>();
-        private SortedList<string, LoginClient> _waitingAcc = new SortedList<string, LoginClient>();
+        private readonly PacketHandler _packetHandler;
+        private readonly ConcurrentDictionary<int, LoginClient> _loggedClients;
+        private readonly ConcurrentDictionary<string, DateTime> _flood = new ConcurrentDictionary<string, DateTime>();
 
-        public static ClientManager Instance
+        public ClientManager(PacketHandler packetHandler)
         {
-            get
-            {
-                if (_instance != null)
-                    return _instance;
-
-                lock (SyncRoot)
-                {
-                    if (_instance == null)
-                        _instance = new ClientManager();
-                }
-
-                return _instance;
-            }
+            _packetHandler = packetHandler;
+            _loggedClients = new ConcurrentDictionary<int, LoginClient>();
         }
 
-        public void Initialize()
+        public async Task Initialise()
         {
+            if (Initialised)
+            {
+                return;
+            }
+
             Log.Info("Loading client manager.");
 
-            Log.Info("Scrambling keypairs.");
+            GenerateScrambledKeys();
+            GenerateBlowfishKeys();
 
-            _scrambledPairs = new ScrambledKeyPair[ScrambleCount];
-
-            for (int i = 0; i < ScrambleCount; i++)
-                _scrambledPairs[i] = new ScrambledKeyPair(ScrambledKeyPair.genKeyPair());
-
-            Log.Info($"Scrambled {_scrambledPairs.Length} keypairs.");
-            Log.Info("Randomize blowfish keys.");
-
-            _blowfishKeys = new byte[BlowfishCount][];
-
-            for (int i = 0; i < BlowfishCount; i++)
-            {
-                _blowfishKeys[i] = new byte[16];
-                new Random().NextBytes(_blowfishKeys[i]);
-            }
-
-            Log.Info($"Randomized {_blowfishKeys.Length} blowfish keys.");
+            Initialised = true;
         }
-
-        private NetworkBlock _banned;
-        private readonly SortedList<string, DateTime> _flood = new SortedList<string, DateTime>();
 
         public void AddClient(TcpClient client)
         {
-            if (_banned == null)
-                _banned = NetworkBlock.Instance;
-
             string ip = client.Client.RemoteEndPoint.ToString().Split(':')[0];
             Log.Info($"Connected: {ip}");
 
-            lock (_flood)
+            if (_flood.ContainsKey(ip))
             {
-                if (_flood.ContainsKey(ip))
+                if (_flood[ip].CompareTo(DateTime.UtcNow) == 1)
                 {
-                    if (_flood[ip].CompareTo(DateTime.Now) == 1)
-                    {
-                        Log.Warn($"Active flooder: {ip}");
-                        client.Close();
-                        return;
-                    }
-
-                    _flood.Remove(ip);
+                    Log.Warn($"Active flooder: {ip}");
+                    client.Close();
+                    return;
                 }
+
+                DateTime oldDate;
+                _flood.TryRemove(ip, out oldDate);
             }
 
-            _flood.Add(ip, DateTime.Now.AddMilliseconds(3000));
+            _flood.AddOrUpdate(ip, DateTime.UtcNow.AddMilliseconds(3000), (a, b) => DateTime.UtcNow.AddMilliseconds(3000));
 
-            if (!_banned.Allowed(ip))
+            if (!NetworkBlock.Instance.Allowed(ip))
             {
                 client.Close();
                 Log.Error($"NetworkBlock: connection attemp failed. IP: {ip} banned.");
                 return;
             }
 
-            LoginClient lc = new LoginClient(client);
-            if (_loggedClients.Contains(lc))
-                return;
+            LoginClient loginClient = new LoginClient(client, this, _packetHandler);
 
-            _loggedClients.Add(lc);
+            _loggedClients.TryAdd(loginClient.SessionId, loginClient);
         }
 
         public ScrambledKeyPair GetScrambledKeyPair()
@@ -112,15 +85,47 @@ namespace L2dotNET.LoginService.Managers
 
         public byte[] GetBlowfishKey()
         {
-            return _blowfishKeys[new Random().Next(BlowfishCount - 1)];
+            return _blowfishKeys[RandomThreadSafe.Instance.Next(BlowfishCount - 1)];
         }
 
         public void RemoveClient(LoginClient loginClient)
         {
-            if (!_loggedClients.Contains(loginClient))
+            if (!_loggedClients.ContainsKey(loginClient.SessionId))
+            {
                 return;
+            }
 
-            _loggedClients.Remove(loginClient);
+            LoginClient o;
+            _loggedClients.TryRemove(loginClient.SessionId, out o);
+        }
+
+        private void GenerateScrambledKeys()
+        {
+            Log.Info("Scrambling keypairs.");
+
+            _scrambledPairs = new ScrambledKeyPair[ScrambleCount];
+
+            for (int i = 0; i < ScrambleCount; i++)
+            {
+                _scrambledPairs[i] = new ScrambledKeyPair(ScrambledKeyPair.genKeyPair());
+            }
+
+            Log.Info($"Scrambled {_scrambledPairs.Length} keypairs.");
+        }
+
+        private void GenerateBlowfishKeys()
+        {
+            Log.Info("Randomize blowfish keys.");
+
+            _blowfishKeys = new byte[BlowfishCount][];
+
+            for (int i = 0; i < BlowfishCount; i++)
+            {
+                _blowfishKeys[i] = new byte[16];
+                RandomThreadSafe.Instance.NextBytes(_blowfishKeys[i]);
+            }
+
+            Log.Info($"Randomized {_blowfishKeys.Length} blowfish keys.");
         }
     }
 }

@@ -1,6 +1,6 @@
-﻿using System.Linq;
-using L2dotNET.model.player;
-using L2dotNET.model.skills;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -11,7 +11,7 @@ namespace L2dotNET.Network.clientpackets
         private readonly int _skillId;
         private readonly int _skillLv;
 
-        public RequestDispel(Packet packet, GameClient client)
+        public RequestDispel(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             packet.MoveOffset(2);
             _client = client;
@@ -20,16 +20,18 @@ namespace L2dotNET.Network.clientpackets
             _skillLv = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            if (_ownerId != player.ObjId)
+            await Task.Run(() =>
             {
-                player.SendActionFailed();
-                return;
-            }
-            
+                L2Player player = _client.CurrentPlayer;
+
+                if (_ownerId != player.ObjectId)
+                {
+                    player.SendActionFailedAsync();
+                    return;
+                }
+            });
         }
     }
 }

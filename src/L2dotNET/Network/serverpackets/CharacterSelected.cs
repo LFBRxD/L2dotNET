@@ -1,5 +1,5 @@
 ﻿using L2dotNET.Controllers;
-using L2dotNET.model.player;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -19,7 +19,7 @@ namespace L2dotNET.Network.serverpackets
             WriteByte(0x15);
 
             WriteString(_player.Name);
-            WriteInt(_player.ObjId);
+            WriteInt(_player.ObjectId);
             WriteString(_player.Title);
             WriteInt(_session);
 
@@ -34,11 +34,11 @@ namespace L2dotNET.Network.serverpackets
             WriteInt(_player.Y);
 
             WriteInt(_player.Z);
-            WriteDouble(_player.CurHp);
-            WriteDouble(_player.CurMp);
+            WriteDouble(_player.CharStatus.CurrentHp);
+            WriteDouble(_player.CharStatus.CurrentMp);
             WriteInt(_player.Sp);
 
-            WriteLong(_player.Exp);
+            WriteLong(_player.Experience);
             WriteInt(_player.Level);
             WriteInt(_player.Karma);
             WriteInt(0); //?
@@ -56,7 +56,7 @@ namespace L2dotNET.Network.serverpackets
             WriteInt(0x00); // c3 work
             WriteInt(0x00); // c3 work
 
-            WriteInt(GameTime.Instance.Time);
+            WriteInt(GameTime.IngameTime);
 
             WriteInt(0x00); // c3
 

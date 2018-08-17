@@ -1,6 +1,6 @@
-﻿using L2dotNET.model.player;
+﻿using L2dotNET.Models.Player;
 
-namespace L2dotNET.managers
+namespace L2dotNET.Managers
 {
     public class PointCmdManager
     {
@@ -18,12 +18,12 @@ namespace L2dotNET.managers
             switch (text)
             {
                 case "traffic":
-                    player.SendMessage($"Down: {player.Gameclient.TrafficDown / 1024} kb");
-                    player.SendMessage($"Up: {player.Gameclient.TrafficUp / 1024} kb");
+                   // player.SendMessageAsync($"Down: {player.Gameclient.TrafficDown / 1024} kb");
+                   // player.SendMessageAsync($"Up: {player.Gameclient.TrafficUp / 1024} kb");
                     break;
 
                 default:
-                    player.SendMessage($"accepted point cmd {text}");
+                    player.SendMessageAsync($"accepted point cmd {text}");
                     break;
             }
 

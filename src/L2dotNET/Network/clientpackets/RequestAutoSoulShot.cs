@@ -1,5 +1,7 @@
-﻿using L2dotNET.model.items;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -9,7 +11,7 @@ namespace L2dotNET.Network.clientpackets
         private readonly int _itemId;
         private readonly int _type;
 
-        public RequestAutoSoulShot(Packet packet, GameClient client)
+        public RequestAutoSoulShot(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             packet.MoveOffset(2);
             _client = client;
@@ -17,11 +19,14 @@ namespace L2dotNET.Network.clientpackets
             _type = packet.ReadInt(); //1 - enable
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
+            await Task.Run(() =>
+            {
+                L2Player player = _client.CurrentPlayer;
 
-            L2Item item = player.Inventory.GetItemByItemId(_itemId);
+                L2Item item = player.Inventory.GetItemByItemId(_itemId);
+            });
         }
     }
 }

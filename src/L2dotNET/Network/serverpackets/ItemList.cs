@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
-using L2dotNET.model.items;
-using L2dotNET.model.player;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -17,14 +17,14 @@ namespace L2dotNET.Network.serverpackets
             {
                 _items.Add(new ItemListItem
                 {
-                    ObjectId = item.ObjId,
+                    ObjectId = item.ObjectId,
                     ItemId = item.Template.ItemId,
                     Slot = item.SlotLocation,
                     Count = item.Count,
                     Type2 = (short)item.Template.Type2,
                     CType1 = item.CustomType1,
                     Equip = item.IsEquipped,
-                    Bodypart = item.Template.BodyPart,
+                    Bodypart = (int) item.Template.BodyPart,
                     Enchant = item.Enchant,
                     CType2 = item.CustomType2,
                     Augment = item.AugmentationId,
@@ -33,7 +33,7 @@ namespace L2dotNET.Network.serverpackets
                 });
 
                 if (item.Blocked)
-                    _blocked.Add(item.ObjId);
+                    _blocked.Add(item.ObjectId);
             }
         }
 

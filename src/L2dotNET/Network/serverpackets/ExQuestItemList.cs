@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using L2dotNET.model.items;
-using L2dotNET.model.player;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -18,7 +18,7 @@ namespace L2dotNET.Network.serverpackets
                 return;
 
             foreach (L2Item item in _items.Where(item => item.Blocked))
-                _block.Add(item.ObjId);
+                _block.Add(item.ObjectId);
         }
 
         public override void Write()

@@ -1,9 +1,9 @@
 ﻿using System.Linq;
-using L2dotNET.model.player;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
-using L2dotNET.world;
 
-namespace L2dotNET.model.vehicles
+namespace L2dotNET.Models.Vehicles
 {
     public class L2Boat : L2Object
     {
@@ -13,10 +13,10 @@ namespace L2dotNET.model.vehicles
         {
         }
 
-        public override void BroadcastUserInfo()
+        public override async Task BroadcastUserInfoAsync()
         {
             foreach (L2Player obj in KnownObjects.Values.OfType<L2Player>())
-                obj.SendPacket(new VehicleInfo(this));
+                await obj.SendPacketAsync(new VehicleInfo(this));
         }
     }
 }

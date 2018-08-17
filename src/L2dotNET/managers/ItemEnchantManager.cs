@@ -1,11 +1,12 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using L2dotNET.DataContracts.Shared.Enums;
 using L2dotNET.Enums;
-using L2dotNET.model.items;
-using L2dotNET.model.player;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
-namespace L2dotNET.managers
+namespace L2dotNET.Managers
 {
     public class ItemEnchantManager
     {
@@ -86,34 +87,34 @@ namespace L2dotNET.managers
             switch (dat.Crystall)
             {
                 case (CrystalTypeId)1:
-                    next = player.EnchantItem.Template.CrystalType == CrystalType.D;
+                    next = player.EnchantItem.Template.CrystalType == CrystalType.D.Id;
                     break;
                 case (CrystalTypeId)2:
-                    next = player.EnchantItem.Template.CrystalType == CrystalType.C;
+                    next = player.EnchantItem.Template.CrystalType == CrystalType.C.Id;
                     break;
                 case (CrystalTypeId)3:
-                    next = player.EnchantItem.Template.CrystalType == CrystalType.B;
+                    next = player.EnchantItem.Template.CrystalType == CrystalType.B.Id;
                     break;
                 case (CrystalTypeId)4:
-                    next = player.EnchantItem.Template.CrystalType == CrystalType.A;
+                    next = player.EnchantItem.Template.CrystalType == CrystalType.A.Id;
                     break;
                 case (CrystalTypeId)5:
-                    next = player.EnchantItem.Template.CrystalType == CrystalType.S;
+                    next = player.EnchantItem.Template.CrystalType == CrystalType.S.Id;
                     break;
             }
 
             if (!next)
             {
-                player.SendPacket(new ExPutEnchantTargetItemResult());
+                player.SendPacketAsync(new ExPutEnchantTargetItemResult());
                 player.EnchantScroll = null;
                 player.EnchantState = 0;
-                player.SendSystemMessage(SystemMessage.SystemMessageId.DoesNotFitScrollConditions);
+                player.SendSystemMessage(SystemMessageId.DoesNotFitScrollConditions);
             }
             else
             {
                 player.EnchantState = StateEnchantStart;
                 player.EnchantItem = item;
-                player.SendPacket(new ExPutEnchantTargetItemResult(item.ObjId));
+                player.SendPacketAsync(new ExPutEnchantTargetItemResult(item.ObjectId));
             }
         }
 
@@ -121,8 +122,8 @@ namespace L2dotNET.managers
         {
             if (!_supports.ContainsKey(stone.Template.ItemId))
             {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.IncorrectSupportEnhancementSpellbook);
-                player.SendActionFailed();
+                player.SendSystemMessage(SystemMessageId.IncorrectSupportEnhancementSpellbook);
+                player.SendActionFailedAsync();
                 return;
             }
 
@@ -132,32 +133,32 @@ namespace L2dotNET.managers
             switch (dat.Crystall)
             {
                 case (CrystalTypeId)1:
-                    next = player.EnchantItem.Template.CrystalType == CrystalType.D;
+                    next = player.EnchantItem.Template.CrystalType == CrystalType.D.Id;
                     break;
                 case (CrystalTypeId)2:
-                    next = player.EnchantItem.Template.CrystalType == CrystalType.C;
+                    next = player.EnchantItem.Template.CrystalType == CrystalType.C.Id;
                     break;
                 case (CrystalTypeId)3:
-                    next = player.EnchantItem.Template.CrystalType == CrystalType.B;
+                    next = player.EnchantItem.Template.CrystalType == CrystalType.B.Id;
                     break;
                 case (CrystalTypeId)4:
-                    next = player.EnchantItem.Template.CrystalType == CrystalType.A;
+                    next = player.EnchantItem.Template.CrystalType == CrystalType.A.Id;
                     break;
                 case (CrystalTypeId)5:
-                    next = player.EnchantItem.Template.CrystalType == CrystalType.S;
+                    next = player.EnchantItem.Template.CrystalType == CrystalType.S.Id;
                     break;
             }
 
             if (!next)
             {
-                player.SendPacket(new ExPutEnchantSupportItemResult());
+                player.SendPacketAsync(new ExPutEnchantSupportItemResult());
                 player.EnchantStone = null;
-                player.SendSystemMessage(SystemMessage.SystemMessageId.ItemDoesNotMeetRequirementsForSupportEnhancementSpellbook);
+                player.SendSystemMessage(SystemMessageId.ItemDoesNotMeetRequirementsForSupportEnhancementSpellbook);
             }
             else
             {
                 player.EnchantStone = stone;
-                player.SendPacket(new ExPutEnchantSupportItemResult(stone.ObjId));
+                player.SendPacketAsync(new ExPutEnchantSupportItemResult(stone.ObjectId));
             }
         }
     }

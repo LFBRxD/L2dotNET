@@ -1,69 +1,85 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using L2dotNET.model.player;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.loginauth;
 using L2dotNET.Network.serverpackets;
 using L2dotNET.Services.Contracts;
-using Ninject;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace L2dotNET.Network.clientpackets
 {
     class AuthLogin : PacketBase
     {
-        [Inject]
-        public IAccountService AccountService { get; set; } = GameServer.Kernel.Get<IAccountService>();
-
-        [Inject]
-        public IPlayerService PlayerService { get; set; } = GameServer.Kernel.Get<IPlayerService>();
+        private readonly ICharacterService _characterService;
+        private readonly AuthThread _authThread;
 
         private readonly GameClient _client;
         private readonly string _loginName;
-        private readonly int _playKey1;
-        private readonly int _playKey2;
-        private readonly int _loginKey1;
-        private readonly int _loginKey2;
+        private readonly SessionKey _key;
 
-        public AuthLogin(Packet packet, GameClient client)
+        public AuthLogin(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
+            _authThread = serviceProvider.GetService<AuthThread>();
+            _characterService = serviceProvider.GetService<ICharacterService>();
+
             _loginName = packet.ReadString();
-            _playKey2 = packet.ReadInt();
-            _playKey1 = packet.ReadInt();
-            _loginKey1 = packet.ReadInt();
-            _loginKey2 = packet.ReadInt();
+
+            int _playKey2 = packet.ReadInt();
+            int _playKey1 = packet.ReadInt();
+            int _loginKey1 = packet.ReadInt();
+            int _loginKey2 = packet.ReadInt();
+
+            _key = new SessionKey(_loginKey1, _loginKey2, _playKey1, _playKey2);
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            if (_client.AccountName == null)
+            if (_client.Account != null)
             {
-                _client.SessionKey = new SessionKey(_loginKey1,_loginKey2, _playKey1, _playKey2);
-
-                _client.AccountName = _loginName;
-
-                List<int> players = AccountService.GetPlayerIdsListByAccountName(_loginName);
-
-                int slot = 0;
-                foreach (L2Player p in players.Select(id => PlayerService.RestorePlayer(id, _client)))
-                {
-                    //TODO: Make delete on startup server or timer listener
-                    // See if the char must be deleted
-                    if (p.CharDeleteTimeExpired())
-                    {
-                        PlayerService.DeleteCharByObjId(p.ObjId);
-                        continue;
-                    }
-
-                    p.CharSlot = slot;
-                    slot++;
-                    _client.AccountChars.Add(p);
-                }
-
-                _client.SendPacket(new CharacterSelectionInfo(_client.AccountName, _client.AccountChars, _client.SessionKey.PlayOkId1));
-                AuthThread.Instance.SetInGameAccount(_client.AccountName, true);
+                _client.CloseConnection();
+                return;
             }
-            else
-                _client.Termination();
+
+            Tuple<AccountContract, SessionKey, DateTime> accountTuple = _authThread.GetAwaitingAccount(_loginName);
+
+            if (accountTuple == null)
+            {
+                Log.Error($"Account is not awaited. Disconnecting. Login: {_loginName}");
+                _client.CloseConnection();
+                return;
+            }
+
+            AccountContract account = accountTuple.Item1;
+            SessionKey accountKey = accountTuple.Item2;
+            DateTime waitStarTime = accountTuple.Item3;
+
+            // TODO: move 5s to config
+            if ((DateTime.UtcNow - waitStarTime).TotalMilliseconds > 5000)
+            {
+                Log.Error($"Account login timeout. AccountId: {account.AccountId}");
+                _client.CloseConnection();
+                return;
+            }
+
+            if (accountKey != _key)
+            {
+                Log.Error($"Invalid SessionKey. AccountId: {account.AccountId}");
+                _client.CloseConnection();
+                return;
+            }
+
+            _client.SessionKey = accountKey;
+
+            _client.Account = account;
+
+            await _client.FetchAccountCharacters();
+
+            _client.SendPacketAsync(new CharList(_client, _client.SessionKey.PlayOkId1));
+            _authThread.SetInGameAccount(_client.Account.Login, true);
+
         }
     }
 }

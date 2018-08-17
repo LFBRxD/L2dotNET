@@ -1,6 +1,5 @@
-﻿using System.Linq;
-using L2dotNET.model.player;
-using L2dotNET.Network.serverpackets;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace L2dotNET.Network.clientpackets.ClanAPI
 {
@@ -10,7 +9,7 @@ namespace L2dotNET.Network.clientpackets.ClanAPI
         private readonly int _unk1;
         private readonly string _player;
 
-        public RequestPledgeMemberInfo(Packet packet, GameClient client)
+        public RequestPledgeMemberInfo(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             packet.MoveOffset(2);
             _client = client;
@@ -18,8 +17,9 @@ namespace L2dotNET.Network.clientpackets.ClanAPI
             _player = packet.ReadString();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
+            await Task.FromResult(1);
             //L2Player player = _client.CurrentPlayer;
 
             //if (player.Clan == null)

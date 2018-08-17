@@ -1,18 +1,25 @@
-﻿using L2dotNET.Attributes;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Attributes;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Commands.Admin
 {
     [Command(CommandName = "summon2")]
     class AdminSpawnEnchanted : AAdminCommand
     {
-        protected internal override void Use(L2Player admin, string alias)
+        protected internal override async Task UseAsync(L2Player admin, string alias)
         {
-            //summon2 [enchant] [id | name] -- призывает предмет [id | name] , заточенный на [enchant]
+            await Task.Run(() =>
+            {
+                short enchant = short.Parse(alias.Split(' ')[1]);
+                int id = int.Parse(alias.Split(' ')[2]);
+                admin.AddItem(id, 1);
+            });
+        }
 
-            short enchant = short.Parse(alias.Split(' ')[1]);
-            int id = int.Parse(alias.Split(' ')[2]);
-            admin.AddItem(id, 1);
+        public AdminSpawnEnchanted(IServiceProvider serviceProvider) : base(serviceProvider)
+        {
         }
     }
 }

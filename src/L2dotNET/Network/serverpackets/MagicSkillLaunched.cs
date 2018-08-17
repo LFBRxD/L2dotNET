@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using L2dotNET.world;
+using L2dotNET.Models;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -15,7 +15,7 @@ namespace L2dotNET.Network.serverpackets
             _id = id;
             _level = lvl;
             _targets = targets.ToArray();
-            _casterId = caster.ObjId;
+            _casterId = caster.ObjectId;
         }
 
         /// <summary>

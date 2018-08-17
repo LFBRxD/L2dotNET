@@ -1,32 +1,34 @@
-﻿using System.Reflection.Emit;
-using L2dotNET.model.inventory;
-using L2dotNET.model.player;
+﻿using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Player;
+using static L2dotNET.Models.Inventory.Inventory;
 
 namespace L2dotNET.Models.Stats.Funcs
 {
-    public class FuncPDefMod : Func
+    public class FuncPDefMod : StatFunction
     {
-        public FuncPDefMod() : base(Stats.PowerDefence, 0x20, null)
+        public static FuncPDefMod Instance = new FuncPDefMod();
+
+        private FuncPDefMod() : base(CharacterStatId.PowerDefence, 0x20)
         {
         }
 
-        public override void Calculate(Env env)
+        public override void Calculate(StatFunctionEnvironment statFuncEnv)
         {
-            if (env.Character is L2Player player)
+            if (statFuncEnv.Character is L2Player player)
             {
-                if(player.Inventory.GetPaperdollItem(Inventory.PaperdollHead) != null)
-                    env.SubValue(12);
-                if (player.Inventory.GetPaperdollItem(Inventory.PaperdollChest) != null)
-                    env.SubValue(31);
-                if (player.Inventory.GetPaperdollItem(Inventory.PaperdollLegs) != null)
-                    env.SubValue(18);
-                if (player.Inventory.GetPaperdollItem(Inventory.PaperdollGloves) != null)
-                    env.SubValue(8);
-                if (player.Inventory.GetPaperdollItem(Inventory.PaperdollFeet) != null)
-                    env.SubValue(7);
+                if(player.Inventory.GetPaperdollItem(PaperdollHead) != null)
+                    statFuncEnv.SubValue(12);
+                if (player.Inventory.GetPaperdollItem(PaperdollChest) != null)
+                    statFuncEnv.SubValue(31);
+                if (player.Inventory.GetPaperdollItem(PaperdollLegs) != null)
+                    statFuncEnv.SubValue(18);
+                if (player.Inventory.GetPaperdollItem(PaperdollGloves) != null)
+                    statFuncEnv.SubValue(8);
+                if (player.Inventory.GetPaperdollItem(PaperdollFeet) != null)
+                    statFuncEnv.SubValue(7);
             }
 
-            env.MulValue(env.Character.GetLevelMod());
+            statFuncEnv.MulValue(statFuncEnv.Character.GetLevelMod());
         }
     }
 }

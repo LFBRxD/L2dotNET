@@ -1,19 +1,22 @@
-﻿namespace L2dotNET.Network.loginauth.recv
+﻿using System;
+using System.Threading.Tasks;
+
+namespace L2dotNET.Network.loginauth.recv
 {
     class LoginServLoginFail : PacketBase
     {
-        private readonly AuthThread _login;
+        private readonly AuthThread _authThread;
         private readonly string _code;
 
-        public LoginServLoginFail(Packet p, AuthThread login)
+        public LoginServLoginFail(IServiceProvider serviceProvider, Packet p, AuthThread authThread) : base(serviceProvider)
         {
-            _login = login;
+            _authThread = authThread;
             _code = p.ReadString();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            _login.LoginFail(_code);
+            _authThread.LoginFail(_code);
         }
     }
 }

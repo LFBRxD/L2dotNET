@@ -3,51 +3,47 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using log4net;
+using System.Threading.Tasks;
 using L2dotNET.DataContracts.GameModels;
 using L2dotNET.Utility;
+using NLog;
 
-namespace L2dotNET.tables
+namespace L2dotNET.Tables
 {
-    public class HtmCache
+    public class HtmCache : IInitialisable
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(HtmCache));
-        private static volatile HtmCache _instance;
-        private static readonly object SyncRoot = new object();
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private List<L2Html> _htmCache;
         private List<string> _htmFiles;
+        public bool Initialised { get; private set; }
 
-        public static HtmCache Instance
+        private readonly Config.Config _config;
+        public HtmCache(Config.Config config)
         {
-            get
-            {
-                if (_instance != null)
-                    return _instance;
-
-                lock (SyncRoot)
-                {
-                    if (_instance == null)
-                        _instance = new HtmCache();
-                }
-
-                return _instance;
-            }
+            _config = config;
         }
 
-        public void Initialize()
+        public async Task Initialise()
         {
+            if (Initialised)
+            {
+                return;
+            }
+
             _htmCache = new List<L2Html>();
-            _htmFiles = DirSearch("./html/");
-            if (!Config.Config.Instance.ServerConfig.LazyHtmlCache)
+            _htmFiles = DirSearch("./html");
+            if (!_config.ServerConfig.LazyHtmlCache)
             {
                 BuildHtmCache();
-                Log.Info($"HtmCache: Cache Built. Loaded {_htmCache.Count} files.");
+                Log.Info($"Cache Built. Loaded {_htmCache.Count} files.");
             }
             else
             {
-                Log.Info($"HtmCache : Lazy Cached {_htmFiles.Count} files.");
+                Log.Info($"Lazy Cached {_htmFiles.Count} files.");
             }
+
+            Initialised = true;
         }
 
         public void BuildHtmCache()
@@ -64,7 +60,7 @@ namespace L2dotNET.tables
                 return string.Empty;
 
             L2Html html = _htmCache.FirstOrDefault(x => x.Filename.EqualsIgnoreCase(filename));
-            if (Config.Config.Instance.ServerConfig.LazyHtmlCache && html == null)
+            if (_config.ServerConfig.LazyHtmlCache && html == null)
             {
                 //Fallback for non loaded files
                 string predictedFile = _htmFiles.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == filename);
@@ -91,7 +87,7 @@ namespace L2dotNET.tables
                 return string.Empty;
 
             L2Html html = _htmCache.FirstOrDefault(x => x.Filepath.EqualsIgnoreCase(filename));
-            if (Config.Config.Instance.ServerConfig.LazyHtmlCache && html == null)
+            if (_config.ServerConfig.LazyHtmlCache && html == null)
             {
                 //Fallback for non loaded files
                 string predictedFile = _htmFiles.FirstOrDefault(f => f == filename);
@@ -99,7 +95,7 @@ namespace L2dotNET.tables
                 {
                     CacheFile(predictedFile);
                     //Try Again
-                    html = _htmCache.FirstOrDefault(x => x.Filename.EqualsIgnoreCase(filename));
+                    html = _htmCache.FirstOrDefault(x => x.Filename.EqualsIgnoreCase(Path.GetFileNameWithoutExtension(predictedFile)));
                 }
             }
             return html != null ? html.Content : string.Empty;
@@ -108,6 +104,8 @@ namespace L2dotNET.tables
         private List<string> DirSearch(string sDir)
         {
             List<string> files = new List<string>();
+            sDir += Path.AltDirectorySeparatorChar;
+
             try
             {
                 files.AddRange(Directory.GetFiles(sDir));

@@ -1,21 +1,24 @@
-﻿using System.Collections.Generic;
-using log4net;
-using L2dotNET.model.items;
-using L2dotNET.model.npcs;
-using L2dotNET.model.player;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Npcs;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
+using NLog;
 
 namespace L2dotNET.Network.clientpackets
 {
     class RequestWarehouseWithdraw : PacketBase
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(RequestBypassToServer));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private readonly int _count;
         private readonly int[] _items;
         private readonly GameClient _client;
 
-        public RequestWarehouseWithdraw(Packet packet, GameClient client)
+        public RequestWarehouseWithdraw(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _count = packet.ReadInt();
@@ -31,68 +34,71 @@ namespace L2dotNET.Network.clientpackets
             }
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-            L2Npc npc = player.FolkNpc;
-
-            if (npc == null)
+            await Task.Run(() =>
             {
-                player.SendActionFailed();
-                return;
-            }
+                L2Player player = _client.CurrentPlayer;
+                L2Npc npc = player.FolkNpc;
 
-            int slots = 0;
-
-            for (int i = 0; i < _count; i++)
-            {
-                int objectId = _items[i * 2];
-                int count = _items[(i * 2) + 1];
-
-                L2Item item = null; //player._warehouse.Items[objectId];
-
-                if (item == null)
+                if (npc == null)
                 {
-                    Log.Info($"cant find item {objectId} in warehouse {player.Name}");
-                    player.SendActionFailed();
+                    player.SendActionFailedAsync();
                     return;
                 }
 
-                if (item.Template.Stackable)
-                    slots += 1;
-                else
-                    slots += count;
-            }
+                int slots = 0;
 
-            //InvPrivateWarehouse pw = player._warehouse ?? new InvPrivateWarehouse(player);
-            //int itsize = 0;
-            //else
-            //    itsize = pw.Items.Count;
+                for (int i = 0; i < _count; i++)
+                {
+                    int objectId = _items[i * 2];
+                    int count = _items[(i * 2) + 1];
 
-            if (player.ItemLimitInventory < (player.GetAllItems().Count + slots))
-            {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.SlotsFull);
-                player.SendActionFailed();
-                return;
-            }
+                    L2Item item = null; //player._warehouse.Items[objectId];
 
-            List<int[]> transfer = new List<int[]>();
-            for (int i = 0; i < _count; i++)
-            {
-                int objectId = _items[i * 2];
-                int count = _items[(i * 2) + 1];
+                    if (item == null)
+                    {
+                        Log.Info($"cant find item {objectId} in warehouse {player.Name}");
+                        player.SendActionFailedAsync();
+                        return;
+                    }
 
-                transfer.Add(new[] { objectId, count });
-            }
+                    if (item.Template.Stackable)
+                        slots += 1;
+                    else
+                        slots += count;
+                }
 
-            //pw.transferFrom(player, transfer, false);
+                //InvPrivateWarehouse pw = player._warehouse ?? new InvPrivateWarehouse(player);
+                //int itsize = 0;
+                //else
+                //    itsize = pw.Items.Count;
 
-            //if(npc.Template.fnBye != null)
-            //{
-            //    player.sendPacket(new NpcHtmlMessage(player, npc.Template.fnBye, npc.ObjID, 0));
-            //}
+                if (player.ItemLimitInventory < (player.GetAllItems().Count + slots))
+                {
+                    player.SendSystemMessage(SystemMessageId.SlotsFull);
+                    player.SendActionFailedAsync();
+                    return;
+                }
 
-            player.SendItemList(true);
+                List<int[]> transfer = new List<int[]>();
+                for (int i = 0; i < _count; i++)
+                {
+                    int objectId = _items[i * 2];
+                    int count = _items[(i * 2) + 1];
+
+                    transfer.Add(new[] { objectId, count });
+                }
+
+                //pw.transferFrom(player, transfer, false);
+
+                //if(npc.Template.fnBye != null)
+                //{
+                //    player.sendPacket(new NpcHtmlMessage(player, npc.Template.fnBye, npc.ObjID, 0));
+                //}
+
+                player.SendItemList(true);
+            });
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using L2dotNET.model.vehicles;
+﻿using L2dotNET.Models.Vehicles;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -18,12 +18,13 @@ namespace L2dotNET.Network.serverpackets
         public override void Write()
         {
             WriteByte(0x5A);
-            WriteInt(_boat.ObjId);
+            WriteInt(_boat.ObjectId);
             WriteInt(_speed);
             WriteInt(_rotationSpd);
-            WriteInt(_boat.DestX);
-            WriteInt(_boat.DestY);
-            WriteInt(_boat.DestZ);
+            // TODO: Fix that
+            //WriteInt(_boat.DestX);
+            //WriteInt(_boat.DestY);
+            //WriteInt(_boat.DestZ);
         }
     }
 }

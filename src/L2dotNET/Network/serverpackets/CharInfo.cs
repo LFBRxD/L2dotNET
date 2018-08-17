@@ -1,5 +1,5 @@
-﻿using L2dotNET.model.inventory;
-using L2dotNET.model.player;
+﻿using L2dotNET.Models.Inventory;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -21,7 +21,7 @@ namespace L2dotNET.Network.serverpackets
             WriteInt(_player.Y);
             WriteInt(_player.Z);
             WriteInt(_player.Heading);
-            WriteInt(_player.ObjId);
+            WriteInt(_player.ObjectId);
             WriteString(_player.Name);
 
             WriteInt((int)_player.BaseClass.ClassId.ClassRace);
@@ -67,20 +67,20 @@ namespace L2dotNET.Network.serverpackets
             WriteInt(_player.PvPStatus);
             WriteInt(_player.Karma);
 
-            WriteInt(_player.Stats.PAttackSpeed); //atckspeed
-            WriteInt(_player.Stats.MAttackSpeed); //mattackspeed
+            WriteInt(_player.CharacterStat.PAttackSpeed); //atckspeed
+            WriteInt(_player.CharacterStat.MAttackSpeed); //mattackspeed
 
             WriteInt(_player.PvPStatus);
             WriteInt(_player.Karma);
 
-            WriteInt(_player.Stats.BaseRunSpeed);
-            WriteInt(_player.Stats.BaseWalkSpeed);
+            WriteInt(_player.CharacterStat.RunSpeed);
+            WriteInt(_player.CharacterStat.WalkSpeed);
             WriteInt(50); // swimspeed
             WriteInt(50); // swimspeed
-            WriteInt(_player.Stats.BaseRunSpeed);
-            WriteInt(_player.Stats.BaseWalkSpeed);
-            WriteInt(_player.Stats.BaseRunSpeed);
-            WriteInt(_player.Stats.BaseWalkSpeed);
+            WriteInt(_player.CharacterStat.RunSpeed);
+            WriteInt(_player.CharacterStat.WalkSpeed);
+            WriteInt(_player.CharacterStat.RunSpeed);
+            WriteInt(_player.CharacterStat.WalkSpeed);
             WriteDouble(1);
             WriteDouble(1);
 
@@ -118,11 +118,11 @@ namespace L2dotNET.Network.serverpackets
             WriteInt(_player.AbnormalBitMask);
 
             WriteByte(0); //_activeChar.isFlyingMounted() ? 2 : 0);
-            WriteShort(_player.RecHave);
+            WriteShort(_player.RecomandationsHave);
             WriteInt((int)_player.ActiveClass.ClassId.Id);
 
             WriteInt(_player.MaxCp); //max cp here
-            WriteInt((int)_player.CurCp);
+            WriteInt((int)_player.CurrentCp);
             WriteByte(_player.GetEnchantValue());
             WriteByte(_player.TeamId);
             WriteInt(0);//_player.GetClanCrestLargeId()

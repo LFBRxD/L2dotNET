@@ -1,18 +1,14 @@
-﻿using System.Linq;
-using L2dotNET.DataContracts;
-using L2dotNET.Enums;
-using L2dotNET.model.player;
-using L2dotNET.Models;
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 using L2dotNET.Services.Contracts;
-using Ninject;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace L2dotNET.Network.clientpackets
 {
     class CharacterSelected : PacketBase
     {
-        [Inject]
-        public IPlayerService PlayerService => GameServer.Kernel.Get<IPlayerService>();
-
         private readonly GameClient _client;
         private readonly int _charSlot;
         private readonly int _unk1; // new in C4
@@ -20,7 +16,7 @@ namespace L2dotNET.Network.clientpackets
         private readonly int _unk3; // new in C4
         private readonly int _unk4; // new in C4
 
-        public CharacterSelected(Packet packet, GameClient client)
+        public CharacterSelected(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _charSlot = packet.ReadInt();
@@ -30,22 +26,24 @@ namespace L2dotNET.Network.clientpackets
             _unk4 = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            //if (_client.CurrentPlayer == null)
+            if (_client.CurrentPlayer != null)
             {
-                L2Player player = PlayerService.GetPlayerBySlotId(_client.AccountName, _charSlot);
-
-                if (player == null)
-                    return;
-
-                player.Online = 1;
-                player.Gameclient = _client;
-                _client.CurrentPlayer = player;
-
-                _client.SendPacket(new serverpackets.CharacterSelected(player, _client.SessionKey.PlayOkId1));
+                return;
             }
-        }
 
+            L2Player player = _client.AccountCharacters.FirstOrDefault(x => x.CharacterSlot == _charSlot);
+
+            if (player == null)
+            {
+                Log.Error("Selected character slot is invalid");
+                return;
+            }
+
+            player.SetOnline(_client);
+            _client.AccountCharacters.Clear();
+            _client.SendPacketAsync(new serverpackets.CharacterSelected(player, _client.SessionKey.PlayOkId1));
+        }
     }
 }

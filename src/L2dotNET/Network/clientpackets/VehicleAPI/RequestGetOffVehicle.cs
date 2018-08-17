@@ -1,4 +1,6 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Network.clientpackets.VehicleAPI
@@ -11,7 +13,7 @@ namespace L2dotNET.Network.clientpackets.VehicleAPI
         private readonly int _y;
         private readonly int _z;
 
-        public RequestGetOffVehicle(Packet packet, GameClient client)
+        public RequestGetOffVehicle(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _boatId = packet.ReadInt();
@@ -20,25 +22,28 @@ namespace L2dotNET.Network.clientpackets.VehicleAPI
             _z = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            if ((player.Boat == null) || (player.Boat.ObjId != _boatId))
+            await Task.Run(() =>
             {
-                player.SendActionFailed();
-                return;
-            }
+                L2Player player = _client.CurrentPlayer;
 
-            if (player.Boat.OnRoute)
-            {
-                player.SendActionFailed();
-                return;
-            }
+                if ((player.Boat == null) || (player.Boat.ObjectId != _boatId))
+                {
+                    player.SendActionFailedAsync();
+                    return;
+                }
 
-            player.BroadcastPacket(new StopMoveInVehicle(player, _x, _y, _z));
-            player.BroadcastPacket(new GetOffVehicle(player, _x, _y, _z));
-            player.Boat = null;
+                if (player.Boat.OnRoute)
+                {
+                    player.SendActionFailedAsync();
+                    return;
+                }
+
+                player.BroadcastPacketAsync(new StopMoveInVehicle(player, _x, _y, _z));
+                player.BroadcastPacketAsync(new GetOffVehicle(player, _x, _y, _z));
+                player.Boat = null;
+            });
         }
     }
 }

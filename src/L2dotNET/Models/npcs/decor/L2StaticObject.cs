@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Linq;
-using L2dotNET.model.player;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
-using L2dotNET.templates;
-using L2dotNET.world;
+using L2dotNET.Templates;
 
-namespace L2dotNET.model.npcs.decor
+namespace L2dotNET.Models.Npcs.Decor
 {
     public class L2StaticObject : L2Character
     {
@@ -29,17 +29,17 @@ namespace L2dotNET.model.npcs.decor
         {
         }
 
-        public override void BroadcastUserInfo()
+        public override async Task BroadcastUserInfoAsync()
         {
             foreach (L2Player obj in KnownObjects.Values.OfType<L2Player>())
-                obj.SendPacket(new StaticObject(this));
+                await obj.SendPacketAsync(new StaticObject(this));
         }
 
-        public override void OnAction(L2Player player)
+        public override async Task OnActionAsync(L2Player player)
         {
-            player.SendMessage(AsString());
+            await player.SendMessageAsync(AsString());
 
-            player.SetTarget(this);
+            player.SetTargetAsync(this);
         }
 
         public byte CanBeSelected()

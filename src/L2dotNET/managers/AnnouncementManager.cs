@@ -1,81 +1,74 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using log4net;
+using System.Threading.Tasks;
 using L2dotNET.DataContracts;
-using L2dotNET.model.player;
-using L2dotNET.model.player.basic;
-using L2dotNET.Models;
+using L2dotNET.Models.Player;
+using L2dotNET.Models.Player.Basic;
 using L2dotNET.Network.serverpackets;
 using L2dotNET.Services.Contracts;
-using L2dotNET.world;
-using Ninject;
+using L2dotNET.World;
+using NLog;
 
-namespace L2dotNET.managers
+namespace L2dotNET.Managers
 {
-    class AnnouncementManager
+    public class AnnouncementManager : IInitialisable
     {
-        [Inject]
-        public IServerService ServerService => GameServer.Kernel.Get<IServerService>();
+        private readonly IServerService _serverService;
 
-        private static readonly ILog Log = LogManager.GetLogger(typeof(AnnouncementManager));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
+        public bool Initialised { get; private set; }
 
-        private static volatile AnnouncementManager _instance;
-        private static readonly object SyncRoot = new object();
+        public IEnumerable<AnnouncementContract> Announcements { get; set; }
 
-        public List<AnnouncementContract> Announcements { get; set; }
-
-        public static AnnouncementManager Instance
+        public AnnouncementManager(IServerService serverService)
         {
-            get
-            {
-                if (_instance != null)
-                    return _instance;
-
-                lock (SyncRoot)
-                {
-                    if (_instance == null)
-                        _instance = new AnnouncementManager();
-                }
-
-                return _instance;
-            }
+            _serverService = serverService;
         }
 
-        public void Initialize()
+        public async Task Initialise()
         {
-            Announcements = ServerService.GetAnnouncementsList();
-            Log.Info($"Announcement manager: Loaded {Announcements.Count} annoucements.");
+            if (Initialised)
+            {
+                return;
+            }
+
+            Announcements = await _serverService.GetAnnouncementsList();
+            Log.Info($"Loaded {Announcements.Count()} annoucements.");
+
+            Initialised = true;
         }
 
         public void Announce(string text)
         {
             CreatureSay cs = new CreatureSay(SayIDList.CHAT_ANNOUNCE, text);
-            L2World.Instance.GetPlayers().ForEach(p => p.SendPacket(cs));
+            L2World.GetPlayers().ForEach(p => p.SendPacketAsync(cs));
         }
 
         public void CriticalAnnounce(string text)
         {
             CreatureSay cs = new CreatureSay(SayIDList.CHAT_CRITICAL_ANNOUNCE, text);
-            L2World.Instance.GetPlayers().ForEach(p => p.SendPacket(cs));
+            L2World.GetPlayers().ForEach(p => p.SendPacketAsync(cs));
         }
 
         public void ScreenAnnounce(string text)
         {
             CreatureSay cs = new CreatureSay(SayIDList.CHAT_SCREEN_ANNOUNCE, text);
-            L2World.Instance.GetPlayers().ForEach(p => p.SendPacket(cs));
+            L2World.GetPlayers().ForEach(p => p.SendPacketAsync(cs));
         }
 
         public void OnEnter(L2Player player)
         {
-            if ((Announcements == null) || (Announcements.Count == 0))
+            if (Announcements == null || !Announcements.Any())
+            {
                 return;
+            }
 
             CreatureSay cs = new CreatureSay(SayIDList.CHAT_ANNOUNCE);
 
             foreach (AnnouncementContract announcement in Announcements.Where(announcement => announcement.Type == 0))
             {
                 cs.Text = announcement.Text;
-                player.SendPacket(cs);
+                player.SendPacketAsync(cs);
             }
         }
     }

@@ -1,27 +1,30 @@
-﻿using L2dotNET.DataContracts;
-using L2dotNET.Models;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts;
+using L2dotNET.Services.Contracts;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace L2dotNET.Network.loginauth.recv
 {
     class LoginServAcceptPlayer : PacketBase
     {
+        private readonly ICrudService<AccountContract> _accountCrudService;
         private readonly AuthThread _login;
-        private readonly string _account;
-
-        public LoginServAcceptPlayer(Packet p, AuthThread login)
+        private readonly int _accountId;
+        private readonly SessionKey _key;
+        public LoginServAcceptPlayer(IServiceProvider serviceProvider, Packet p, AuthThread login) : base(serviceProvider)
         {
+            _accountCrudService = serviceProvider.GetService<ICrudService<AccountContract>>();
             _login = login;
-            _account = p.ReadString();
+            _accountId = p.ReadInt();
+            _key = new SessionKey(p.ReadInt(), p.ReadInt(), p.ReadInt(), p.ReadInt());
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            AccountContract ta = new AccountContract
-            {
-                Login = _account
-            };
+            AccountContract account = await _accountCrudService.GetById(_accountId);
 
-            AuthThread.Instance.AwaitAccount(ta);
+            _login.AwaitAddAccount(account, _key);
         }
     }
 }

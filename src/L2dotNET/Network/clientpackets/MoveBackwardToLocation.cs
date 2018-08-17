@@ -1,4 +1,7 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Network.clientpackets
@@ -14,7 +17,7 @@ namespace L2dotNET.Network.clientpackets
         private readonly int _originZ;
         private readonly int _moveMovement;
 
-        public MoveBackwardToLocation(Packet packet, GameClient client)
+        public MoveBackwardToLocation(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _targetX = packet.ReadInt();
@@ -33,27 +36,27 @@ namespace L2dotNET.Network.clientpackets
             }
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
             L2Player player = _client.CurrentPlayer;
 
             if (player.IsSittingInProgress() || player.IsSitting())
             {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.CantMoveSitting);
-                player.SendActionFailed();
+                player.SendSystemMessage(SystemMessageId.CantMoveSitting);
+                player.SendActionFailedAsync();
                 return;
             }
 
             if (player.Boat != null)
             {
-                player.SendMessage("cant leave boat.");
-                player.SendActionFailed();
+                player.SendMessageAsync("cant leave boat.");
+                player.SendActionFailedAsync();
                 return;
             }
 
-            if (player.CantMove())
+            if (!player.CharMovement.CanMove())
             {
-                player.SendActionFailed();
+                player.SendActionFailedAsync();
                 return;
             }
 
@@ -61,17 +64,9 @@ namespace L2dotNET.Network.clientpackets
 
             player.Obsx = -1;
 
-            double dx = _targetX - _originX;
-            double dy = _targetY - _originY;
-
-            if (((dx * dx) + (dy * dy)) > 98010000) // 9900*9900
-            {
-                player.SendActionFailed();
-                return;
-            }
-
+            //player.SendMessageAsync($"distance {Math.Floor(Math.Sqrt(dx * dx + dy * dy))}");
             //player.AiCharacter.StopAutoAttack();
-            player.MoveTo(_targetX, _targetY, _targetZ);
+            player.CharMovement.MoveTo(_targetX, _targetY, _targetZ);
         }
     }
 }

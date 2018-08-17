@@ -1,19 +1,23 @@
-﻿namespace L2dotNET.Network.loginauth.recv
+﻿using System;
+using System.Threading.Tasks;
+
+namespace L2dotNET.Network.loginauth.recv
 {
     class LoginServKickAccount : PacketBase
     {
         private readonly AuthThread _login;
         private readonly string _account;
 
-        public LoginServKickAccount(Packet p, AuthThread login)
+        public LoginServKickAccount(IServiceProvider serviceProvider, Packet p, AuthThread login) : base(serviceProvider)
         {
             _login = login;
             _account = p.ReadString();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            //L2World.Instance.KickAccount(account);
+            await Task.FromResult(1);
+            //L2World.KickAccount(account);
         }
     }
 }

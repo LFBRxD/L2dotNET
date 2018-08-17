@@ -1,5 +1,7 @@
-﻿using L2dotNET.model.items;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -9,7 +11,7 @@ namespace L2dotNET.Network.clientpackets
         private readonly int _count;
         private readonly int[] _items;
 
-        public RequestSaveInventoryOrder(Packet packet, GameClient client)
+        public RequestSaveInventoryOrder(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             packet.MoveOffset(2);
             _client = client;
@@ -24,21 +26,24 @@ namespace L2dotNET.Network.clientpackets
             }
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            foreach (L2Item item in player.Inventory.Items)
+            await Task.Run(() =>
             {
-                for (int i = 0; i < _count; i++)
-                {
-                    int objId = _items[i * 2];
-                    int loc = _items[(i * 2) + 1];
+                L2Player player = _client.CurrentPlayer;
 
-                    if (item.ObjId == objId)
-                        item.SlotLocation = loc;
+                foreach (L2Item item in player.Inventory.Items)
+                {
+                    for (int i = 0; i < _count; i++)
+                    {
+                        int objId = _items[i * 2];
+                        int loc = _items[(i * 2) + 1];
+
+                        if (item.ObjectId == objId)
+                            item.SlotLocation = loc;
+                    }
                 }
-            }
+            });
         }
     }
 }

@@ -1,42 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using log4net;
-using L2dotNET.model.npcs.decor;
+using L2dotNET.Models.Npcs.Decor;
 using L2dotNET.Models.Stats;
 using L2dotNET.Utility;
-using L2dotNET.world;
+using L2dotNET.World;
+using NLog;
 
-namespace L2dotNET.tables
+namespace L2dotNET.Tables
 {
     class StaticObjTable
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(StaticObjTable));
-        private static volatile StaticObjTable _instance;
-        private static readonly object SyncRoot = new object();
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        public static StaticObjTable Instance
+        public static Dictionary<int, L2StaticObject> Objects { get; private set; }
+        
+        public static void Initialize()
         {
-            get
-            {
-                if (_instance != null)
-                    return _instance;
-
-                lock (SyncRoot)
-                {
-                    if (_instance == null)
-                        _instance = new StaticObjTable();
-                }
-
-                return _instance;
-            }
-        }
-
-        public SortedList<int, L2StaticObject> Objects;
-
-        public void Initialize()
-        {
-            Objects = new SortedList<int, L2StaticObject>();
+            Objects = new Dictionary<int, L2StaticObject>();
             using (StreamReader reader = new StreamReader(new FileInfo(@"scripts\staticobjects.txt").FullName))
             {
                 while (!reader.EndOfStream)
@@ -48,7 +29,7 @@ namespace L2dotNET.tables
                     string[] pt = line.Split('\t');
 
                     L2StaticObject obj = null;
-
+                    //TODO: Implement this
                     switch (pt[1])
                     {
                         case "map":
@@ -88,7 +69,7 @@ namespace L2dotNET.tables
                                 obj.Htm = value;
                                 break;
                             case "hp":
-                                obj.Stats = new CharacterStat(obj);
+                                obj.CharacterStat = new CharacterStat(obj);
                                 break;
                             case "defence":
                                 obj.Pdef = Convert.ToInt32(value.Split(' ')[0]);
@@ -123,11 +104,11 @@ namespace L2dotNET.tables
 
             foreach (L2StaticObject o in Objects.Values)
             {
-                L2World.Instance.AddObject(o);
-                o.OnSpawn();
+                L2World.AddObject(o);
+                o.OnSpawnAsync();
             }
 
-            Log.Info($"StaticObjTable: Spanwed {Objects.Count} objects.");
+            Log.Info($"Spawned {Objects.Count} objects.");
         }
     }
 }

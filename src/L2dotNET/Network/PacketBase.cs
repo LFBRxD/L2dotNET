@@ -1,10 +1,20 @@
-﻿using System.Runtime.Remoting.Contexts;
+﻿using System;
+using System.Threading.Tasks;
+using NLog;
 
 namespace L2dotNET.Network
 {
-    [Synchronization]
     public abstract class PacketBase
     {
-        public abstract void RunImpl();
+        protected static readonly Logger Log = LogManager.GetCurrentClassLogger();
+
+        protected readonly IServiceProvider ServiceProvider;
+
+        protected PacketBase(IServiceProvider serviceProvider)
+        {
+            ServiceProvider = serviceProvider;
+        }
+
+        public abstract Task RunImpl();
     }
 }

@@ -1,5 +1,6 @@
-﻿using L2dotNET.model.items;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets.PetAPI
 {
@@ -8,15 +9,18 @@ namespace L2dotNET.Network.clientpackets.PetAPI
         private readonly GameClient _client;
         private readonly int _sId;
 
-        public RequestPetUseItem(Packet packet, GameClient client)
+        public RequestPetUseItem(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _sId = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
+            await Task.Run(() =>
+            {
+                L2Player player = _client.CurrentPlayer;
+            });
         }
     }
 }

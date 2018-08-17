@@ -1,31 +1,38 @@
 ﻿using System;
-using log4net;
+using System.Threading.Tasks;
 using L2dotNET.Attributes;
-using L2dotNET.model.player;
+using L2dotNET.Models.Player;
+using NLog;
 
 namespace L2dotNET.Commands.Admin
 {
     [Command(CommandName = "createitem")]
     class AdminSpawnItem : AAdminCommand
     {
-        private readonly ILog _log = LogManager.GetLogger(typeof(AAdminCommand));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        protected internal override void Use(L2Player admin, string alias)
+        protected internal override async Task UseAsync(L2Player admin, string alias)
         {
-
-            int id = int.Parse(alias.Split(' ')[1]);
-            int count = 1;
-
-            try
+            await Task.Run(() =>
             {
-                count = int.Parse(alias.Split(' ')[2]);
-            }
-            catch (Exception e)
-            {
-                _log.Error($"AdminSpawnItem: {e.Message}");
-            }
+                int id = int.Parse(alias.Split(' ')[1]);
+                int count = 1;
 
-            admin.AddItem(id, count);
+                try
+                {
+                    count = int.Parse(alias.Split(' ')[2]);
+                }
+                catch (Exception e)
+                {
+                    Log.Error($"AdminSpawnItem: {e.Message}");
+                }
+
+                admin.AddItem(id, count);
+            });
+        }
+
+        public AdminSpawnItem(IServiceProvider serviceProvider) : base(serviceProvider)
+        {
         }
     }
 }

@@ -1,5 +1,4 @@
 ﻿using L2dotNET.Network;
-using log4net;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -9,12 +8,13 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using NLog;
 
 namespace L2dotNET.Utility
 {
     public static class Utilz
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(Utilz));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         public static string CurrentTime => DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
 
@@ -34,21 +34,31 @@ namespace L2dotNET.Utility
             return strBuilder.ToString();
         }
 
-        
+        public static double DistanceSq(double x1, double y1, double x2, double y2)
+        {
+            return Math.Pow(x2 - x1, 2) + Math.Pow(y2 - y1, 2);
+        }
+
+        public static double Distance(double x1, double y1, double x2, double y2)
+        {
+            return Math.Sqrt(DistanceSq(x1, y1, x2, y2));
+        }
+
+        public static double LengthSq(double x, double y)
+        {
+            return Math.Pow(x, 2) + Math.Pow(y, 2);
+        }
+
+        public static double Length(double x, double y)
+        {
+            return Math.Sqrt(LengthSq(x, y));
+        }
+
         public static IEnumerable<Type> GetTypesInNamespace(Assembly assembly, string nameSpace)
         {
-            return assembly.GetTypes().Where(t => string.Equals(t.Namespace, nameSpace, StringComparison.Ordinal)).ToArray();
+            return assembly.GetTypes().Where(t => string.Equals(t.Namespace, nameSpace, StringComparison.Ordinal) && t.BaseType != typeof(object)).ToArray();
         }
-
-        private static readonly DateTime Year1970 = new DateTime(1970, 1, 1);
-
-        public static int CurrentSeconds()
-        {
-            TimeSpan ts = Year1970 - DateTime.Now;
-            return (int)ts.TotalSeconds * -1;
-        }
-
-
+        
         public static T GetEnumFromString<T>(string value, T defaultValue) where T : struct, IConvertible
         {
             if (!typeof(T).IsEnum)

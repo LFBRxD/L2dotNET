@@ -1,11 +1,11 @@
 {
   "host": "127.0.0.1",
   "port": "7777",
-  "auth_host": "127.0.0.1",
-  "auth_port": "9014",
-  "auth_code": "elfo",
+  "authHost": "127.0.0.1",
+  "authPort": "9014",
+  "authKey": "E17BE73FF98FAF661DC8754EE3632624E62B87B6AFC883B8089C64045471E2DF",
   "isgmonly": "false",
   "istestserver": "false",
-  "max_players": "100",
-  "lazy_html_cache" : "true"
+  "maxPlayers": "100",
+  "lazyHtmlCache": "true"
 }

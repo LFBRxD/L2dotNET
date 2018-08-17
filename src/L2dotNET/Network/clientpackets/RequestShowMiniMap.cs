@@ -1,4 +1,6 @@
-﻿using L2dotNET.Network.serverpackets;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -6,14 +8,17 @@ namespace L2dotNET.Network.clientpackets
     {
         private readonly GameClient _client;
 
-        public RequestShowMiniMap(Packet packet, GameClient client)
+        public RequestShowMiniMap(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            _client.SendPacket(new ShowMiniMap());
+            await Task.Run(() =>
+            {
+                _client.SendPacketAsync(new ShowMiniMap());
+            });
         }
     }
 }

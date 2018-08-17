@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
-using L2dotNET.model.player;
-using L2dotNET.Network.serverpackets;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -11,7 +11,7 @@ namespace L2dotNET.Network.clientpackets
         private readonly int _level;
         private readonly int _skillType;
 
-        public RequestAcquireSkillInfo(Packet packet, GameClient client)
+        public RequestAcquireSkillInfo(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _id = packet.ReadInt();
@@ -19,10 +19,12 @@ namespace L2dotNET.Network.clientpackets
             _skillType = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-            
+            await Task.Run(() =>
+            {
+                L2Player player = _client.CurrentPlayer;
+            });
         }
     }
 }

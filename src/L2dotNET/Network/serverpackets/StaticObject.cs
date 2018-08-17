@@ -1,4 +1,4 @@
-﻿using L2dotNET.model.npcs.decor;
+﻿using L2dotNET.Models.Npcs.Decor;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -15,7 +15,7 @@ namespace L2dotNET.Network.serverpackets
         {
             WriteByte(0x99);
             WriteInt(_obj.StaticId);
-            WriteInt(_obj.ObjId);
+            WriteInt(_obj.ObjectId);
         }
     }
 }

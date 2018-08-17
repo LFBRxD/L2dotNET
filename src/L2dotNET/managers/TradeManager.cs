@@ -1,10 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using L2dotNET.model.items;
-using L2dotNET.model.player;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
-namespace L2dotNET.managers
+namespace L2dotNET.Managers
 {
     class TradeManager
     {
@@ -17,7 +18,7 @@ namespace L2dotNET.managers
 
         public TradeDone TradeSuccess = new TradeDone();
         public TradeDone TradeFail = new TradeDone(false);
-        public SystemMessage TradeOk = new SystemMessage(SystemMessage.SystemMessageId.TradeSuccessful);
+        public SystemMessage TradeOk = new SystemMessage(SystemMessageId.TradeSuccessful);
 
         private bool ValidateList(L2Player player)
         {
@@ -87,13 +88,13 @@ namespace L2dotNET.managers
                 pl2.CurrentTrade.Clear();
             }
 
-            pl1.SendPacket(TradeOk);
-            pl1.SendPacket(TradeSuccess);
+            pl1.SendPacketAsync(TradeOk);
+            pl1.SendPacketAsync(TradeSuccess);
             pl1.SendItemList(true);
             pl1.TradeState = 0;
 
-            pl2.SendPacket(TradeOk);
-            pl2.SendPacket(TradeSuccess);
+            pl2.SendPacketAsync(TradeOk);
+            pl2.SendPacketAsync(TradeSuccess);
             pl2.SendItemList(true);
             pl2.TradeState = 0;
         }
@@ -102,14 +103,14 @@ namespace L2dotNET.managers
         {
             pl1.TradeState = 0;
             pl1.CurrentTrade.Clear();
-            pl1.SendPacket(TradeFail);
-            pl1.SendPacket(new SystemMessage(SystemMessage.SystemMessageId.S1CanceledTrade).AddPlayerName(name));
+            pl1.SendPacketAsync(TradeFail);
+            pl1.SendPacketAsync(new SystemMessage(SystemMessageId.S1CanceledTrade).AddPlayerName(name));
             pl1.Requester = null;
 
             pl2.TradeState = 0;
             pl2.CurrentTrade.Clear();
-            pl2.SendPacket(TradeFail);
-            pl2.SendPacket(new SystemMessage(SystemMessage.SystemMessageId.S1CanceledTrade).AddPlayerName(name));
+            pl2.SendPacketAsync(TradeFail);
+            pl2.SendPacketAsync(new SystemMessage(SystemMessageId.S1CanceledTrade).AddPlayerName(name));
             pl2.Requester = null;
         }
     }

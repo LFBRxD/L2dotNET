@@ -1,5 +1,7 @@
-﻿using L2dotNET.Attributes;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Attributes;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Commands.Admin
@@ -7,7 +9,7 @@ namespace L2dotNET.Commands.Admin
     [Command(CommandName = "whisper")]
     class AdminWhisper : AAdminCommand
     {
-        protected internal override void Use(L2Player admin, string alias)
+        protected internal override async Task UseAsync(L2Player admin, string alias)
         {
             //whisper [on|off] -- so when whisper is off means no one can message you when whispers on they can message you.
             bool changed;
@@ -16,22 +18,26 @@ namespace L2dotNET.Commands.Admin
                 case "on":
                     changed = admin.WhisperBlock = false;
                     admin.WhisperBlock = true;
-                    admin.SendMessage("Whisper blocking enabled.");
+                    await admin.SendMessageAsync("Whisper blocking enabled.");
                     break;
                 case "off":
                     changed = admin.WhisperBlock = true;
                     admin.WhisperBlock = false;
-                    admin.SendMessage("Whisper blocking disabled.");
+                    await admin.SendMessageAsync("Whisper blocking disabled.");
                     break;
                 default:
                     changed = admin.WhisperBlock = true;
                     admin.WhisperBlock = false;
-                    admin.SendMessage("Whisper blocking disabled.");
+                    await admin.SendMessageAsync("Whisper blocking disabled.");
                     break;
             }
 
             if (changed)
-                admin.SendPacket(new EtcStatusUpdate(admin));
+                await admin.SendPacketAsync(new EtcStatusUpdate(admin));
+        }
+
+        public AdminWhisper(IServiceProvider serviceProvider) : base(serviceProvider)
+        {
         }
     }
 }

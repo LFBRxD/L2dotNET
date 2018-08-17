@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using L2dotNET.world;
+using L2dotNET.Models;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -48,7 +48,7 @@ namespace L2dotNET.Network.serverpackets
 
         public StatusUpdate(L2Object obj)
         {
-            _objectId = obj.ObjId;
+            _objectId = obj.ObjectId;
         }
 
         public override void Write()

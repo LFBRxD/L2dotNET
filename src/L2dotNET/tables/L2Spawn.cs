@@ -1,25 +1,27 @@
 using System;
-using log4net;
-using L2dotNET.model.npcs;
-using L2dotNET.templates;
+using L2dotNET.Models.Npcs;
+using L2dotNET.Templates;
+using NLog;
 
-namespace L2dotNET.tables
+namespace L2dotNET.Tables
 {
     public class L2Spawn
     {
-        private readonly ILog _log = LogManager.GetLogger(typeof(L2Spawn));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         public NpcTemplate Template { get; set; }
         public SpawnLocation Location { get; set; }
 
         public L2Npc Npc { get; set; }
 
-        public L2Spawn(NpcTemplate template)
-        {
-            if (template == null)
-                throw new ArgumentNullException(nameof(template));
+        private readonly IdFactory _idFactory;
+        private readonly SpawnTable _spawnTable;
 
-            Template = template;
+        public L2Spawn(NpcTemplate template, IdFactory idFactory, SpawnTable spawnTable)
+        {
+            Template = template ?? throw new ArgumentNullException(nameof(template));
+            _idFactory = idFactory;
+            _spawnTable = spawnTable;
         }
 
         public int GetNpcId()
@@ -30,18 +32,19 @@ namespace L2dotNET.tables
         public L2Npc Spawn(bool notifyOthers = true)
         {
             L2Npc npc;
-            if (Type.GetType("L2dotNET.Models.npcs."+Template.Type) != null)
+            if (Type.GetType("L2dotNET.Models.Npcs." + Template.Type) != null)
             {
-                npc = (L2Npc)Activator.CreateInstance( Type.GetType("L2dotNET.Models.npcs." + Template.Type), IdFactory.Instance.NextId(), Template);
+                //TODO this is shit. Change it
+                npc = (L2Npc) Activator.CreateInstance(Type.GetType("L2dotNET.Models.Npcs." + Template.Type),
+                        _spawnTable, _idFactory.NextId(), Template, this);
                 npc.X = Location.X;
                 npc.Y = Location.Y;
                 npc.Z = Location.Z;
                 npc.Heading = Location.Heading;
-
             }
             else
             {
-                npc = new L2Npc(IdFactory.Instance.NextId(), Template)
+                npc = new L2Npc(_spawnTable, _idFactory.NextId(), Template, this)
                 {
                     X = Location.X,
                     Y = Location.Y,
@@ -50,7 +53,7 @@ namespace L2dotNET.tables
                 };
             }
             
-            npc.SpawnMe(notifyOthers);
+            npc.SpawnMeAsync(notifyOthers);
             return npc;
         }
     }

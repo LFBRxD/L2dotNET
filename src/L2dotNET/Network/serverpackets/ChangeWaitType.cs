@@ -1,4 +1,4 @@
-﻿using L2dotNET.model.player;
+﻿using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -16,7 +16,7 @@ namespace L2dotNET.Network.serverpackets
 
         public ChangeWaitType(L2Player player, int type)
         {
-            _sId = player.ObjId;
+            _sId = player.ObjectId;
             _x = player.X;
             _y = player.Y;
             _z = player.Z;

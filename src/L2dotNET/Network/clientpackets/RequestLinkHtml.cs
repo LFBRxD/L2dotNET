@@ -1,4 +1,6 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Network.clientpackets
@@ -8,31 +10,34 @@ namespace L2dotNET.Network.clientpackets
         private readonly GameClient _client;
         private readonly string _link;
 
-        public RequestLinkHtml(Packet packet, GameClient client)
+        public RequestLinkHtml(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _link = packet.ReadString();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            // log.Info($"link to '{ _link }'");
-
-            string file;
-            int id = 0;
-            if (_link.Contains("#"))
+            await Task.Run(() =>
             {
-                file = _link.Split('#')[0];
-                id = int.Parse(_link.Split('#')[1]);
-            }
-            else
-                file = _link;
+                L2Player player = _client.CurrentPlayer;
 
-            int idx = player.Target?.ObjId ?? player.ObjId;
+                // Log.Info($"link to '{ _link }'");
 
-            player.SendPacket(new NpcHtmlMessage(player, file, idx, id));
+                string file;
+                int id = 0;
+                if (_link.Contains("#"))
+                {
+                    file = _link.Split('#')[0];
+                    id = int.Parse(_link.Split('#')[1]);
+                }
+                else
+                    file = _link;
+
+                int idx = player.Target?.ObjectId ?? player.ObjectId;
+
+                player.SendPacketAsync(new NpcHtmlMessage(player, file, idx, id));
+            });
         }
     }
 }

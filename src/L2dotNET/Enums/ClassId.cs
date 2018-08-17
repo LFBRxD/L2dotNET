@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using System.Runtime.Serialization.Formatters;
+using L2dotNET.DataContracts.Shared.Enums;
 using L2dotNET.Utility;
 
 namespace L2dotNET.Enums

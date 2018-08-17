@@ -1,17 +1,17 @@
 ﻿using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.IO;
-using log4net;
 using Microsoft.CSharp;
+using NLog;
 
-namespace L2dotNET.scripting
+namespace L2dotNET.Scripting
 {
     /// <summary>
     /// Idea L2cemu
     /// </summary>
     public class ScriptCompiler
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(ScriptCompiler));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private readonly CSharpCodeProvider _provider;
 
@@ -59,7 +59,7 @@ namespace L2dotNET.scripting
                     objectList.Add(result.CompiledAssembly.CreateInstance(Path.GetFileNameWithoutExtension(info.Name)));
             }
 
-            Log.Info($"Script Compiler: Compiled {objectList.Count} scripted quests.");
+            Log.Info($"Compiled {objectList.Count} scripted quests.");
 
             return objectList.ToArray();
         }

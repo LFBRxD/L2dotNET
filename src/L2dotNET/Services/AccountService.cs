@@ -1,37 +1,56 @@
-﻿using System.Collections.Generic;
+﻿using System.Linq;
+using System.Threading.Tasks;
 using L2dotNET.DataContracts;
+using L2dotNET.Repositories.Abstract;
 using L2dotNET.Repositories.Contracts;
 using L2dotNET.Services.Contracts;
+using L2dotNET.Utility;
 
 namespace L2dotNET.Services
 {
     public class AccountService : IAccountService
     {
-        private readonly IUnitOfWork _unitOfWork;
+        private readonly IAccountRepository _accountRepository;
+        private readonly ICrudRepository<AccountContract> _accountCrudRepository;
 
-        public AccountService(IUnitOfWork unitOfWork)
+        public AccountService(IAccountRepository accountRepository, ICrudRepository<AccountContract> accountCrudRepository)
         {
-            _unitOfWork = unitOfWork;
+            _accountRepository = accountRepository;
+            _accountCrudRepository = accountCrudRepository;
         }
 
-        public AccountContract GetAccountByLogin(string login)
+        public async Task<AccountContract> GetAccountByLogin(string login)
         {
-            return _unitOfWork.AccountRepository.GetAccountByLogin(login);
+            return await _accountRepository.GetAccountByLogin(login);
         }
 
-        public AccountContract CreateAccount(string login, string password)
+        public async Task<AccountContract> CreateAccount(string login, string password)
         {
-            return _unitOfWork.AccountRepository.CreateAccount(login, password);
+            AccountContract acc = new AccountContract
+                {
+                    Login = login,
+                    Password = L2Security.HashPassword(password)
+                };
+
+            acc.AccountId = (int)await _accountCrudRepository.Add(acc);
+
+            return acc;
         }
 
-        public bool CheckIfAccountIsCorrect(string login, string password)
+        public async Task<bool> CheckIfAccountIsCorrect(string login, string password)
         {
-            return _unitOfWork.AccountRepository.CheckIfAccountIsCorrect(login, password);
+            AccountContract account = await GetAccountByLogin(login);
+            return account != null && account.Password.SequenceEqual(L2Security.HashPassword(password));
         }
 
-        public List<int> GetPlayerIdsListByAccountName(string login)
+        public void UpdateAccount(AccountContract account)
         {
-            return _unitOfWork.AccountRepository.GetPlayerIdsListByAccountName(login);
+            _accountCrudRepository.Update(account);
+        }
+
+        public void DeleteAccount(AccountContract account)
+        {
+            _accountCrudRepository.Delete(account);
         }
     }
 }

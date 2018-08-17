@@ -1,42 +1,39 @@
 ﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using L2dotNET.DataContracts;
-using L2dotNET.Repositories.Contracts;
+using L2dotNET.Repositories.Abstract;
 using L2dotNET.Services.Contracts;
 
 namespace L2dotNET.Services
 {
     public class ServerService : IServerService
     {
-        private readonly IUnitOfWork _unitOfWork;
+        private readonly ICrudRepository<AnnouncementContract> _announcementCrudRepository;
+        private readonly ICrudRepository<ServerContract> _serverCrudRepository;
+        private readonly ICrudRepository<SpawnlistContract> _spawnlistCrudRepository;
 
-        public ServerService(IUnitOfWork unitOfWork)
+        public ServerService(ICrudRepository<AnnouncementContract> announcementCrudRepository,
+            ICrudRepository<ServerContract> serverCrudRepository,
+            ICrudRepository<SpawnlistContract> spawnlistCrudRepository)
         {
-            _unitOfWork = unitOfWork;
+            _announcementCrudRepository = announcementCrudRepository;
+            _serverCrudRepository = serverCrudRepository;
+            _spawnlistCrudRepository = spawnlistCrudRepository;
         }
 
-        public List<ServerContract> GetServerList()
+        public async Task<IEnumerable<ServerContract>> GetServerList()
         {
-            return _unitOfWork.ServerRepository.GetServerList();
+            return await _serverCrudRepository.GetAll();
         }
 
-        public List<int> GetPlayersObjectIdList()
+        public async Task<IEnumerable<AnnouncementContract>> GetAnnouncementsList()
         {
-            return _unitOfWork.ServerRepository.GetPlayersObjectIdList();
+            return await _announcementCrudRepository.GetAll();
         }
 
-        public List<AnnouncementContract> GetAnnouncementsList()
+        public async Task<IEnumerable<SpawnlistContract>> GetAllSpawns()
         {
-            return _unitOfWork.ServerRepository.GetAnnouncementsList();
-        }
-
-        public bool CheckDatabaseQuery()
-        {
-            return _unitOfWork.ServerRepository.CheckDatabaseQuery();
-        }
-
-        public List<SpawnlistContract> GetAllSpawns()
-        {
-            return _unitOfWork.ServerRepository.GetAllSpawns();
+            return await _spawnlistCrudRepository.GetAll();
         }
     }
 }

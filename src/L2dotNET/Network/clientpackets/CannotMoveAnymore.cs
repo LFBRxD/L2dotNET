@@ -1,4 +1,6 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -10,7 +12,7 @@ namespace L2dotNET.Network.clientpackets
         private readonly int _z;
         private readonly int _heading;
 
-        public CannotMoveAnymore(Packet packet, GameClient client)
+        public CannotMoveAnymore(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _x = packet.ReadInt();
@@ -19,11 +21,11 @@ namespace L2dotNET.Network.clientpackets
             _heading = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
             L2Player player = _client.CurrentPlayer;
 
-            player.NotifyStopMove(true, true);
+            player.CharMovement.NotifyStopMove(true);
         }
     }
 }

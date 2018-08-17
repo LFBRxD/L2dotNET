@@ -1,14 +1,15 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using log4net;
-using L2dotNET.model.player;
-using L2dotNET.model.zones;
+using L2dotNET.Models;
+using L2dotNET.Models.Player;
+using L2dotNET.Models.Zones;
+using NLog;
 
-namespace L2dotNET.world
+namespace L2dotNET.World
 {
     public class L2WorldRegion
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(L2WorldRegion));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private readonly Dictionary<int, L2Object> _objects = new Dictionary<int, L2Object>();
 
@@ -196,8 +197,8 @@ namespace L2dotNET.world
             if (obj == null)
                 return;
 
-            if (!_objects.ContainsKey(obj.ObjId))
-                _objects.Add(obj.ObjId, obj);
+            if (!_objects.ContainsKey(obj.ObjectId))
+                _objects.Add(obj.ObjectId, obj);
 
             if (obj is L2Player)
                 _playersCount += 1;
@@ -208,7 +209,7 @@ namespace L2dotNET.world
             if (obj == null)
                 return;
 
-            _objects.Remove(obj.ObjId);
+            _objects.Remove(obj.ObjectId);
 
             if (obj is L2Player)
                 _playersCount -= 1;

@@ -1,41 +1,41 @@
-﻿using System.Linq;
-using log4net;
-using L2dotNET.model.player;
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 using L2dotNET.Services.Contracts;
-using Ninject;
+using L2dotNET.Utility;
+using Microsoft.Extensions.DependencyInjection;
+using NLog;
 
 namespace L2dotNET.Network.clientpackets
 {
     class CharacterRestore : PacketBase
     {
-        [Inject]
-        public IPlayerService PlayerService => GameServer.Kernel.Get<IPlayerService>();
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        private static readonly ILog Log = LogManager.GetLogger(typeof(CharacterDelete));
-
+        private readonly ICrudService<CharacterContract> _characterCrudService;
         private readonly GameClient _client;
         private readonly int _charSlot;
 
-        public CharacterRestore(Packet packet, GameClient client)
+        public CharacterRestore(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
+            _characterCrudService = serviceProvider.GetService<ICrudService<CharacterContract>>();
             _charSlot = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            //if (!FloodProtectors.performAction(getClient(), Action.CHARACTER_SELECT))
-            //    return;
-
             ValidateAndRestore();
 
-            _client.SendPacket(new CharacterSelectionInfo(_client.AccountName, _client.AccountChars, _client.SessionKey.PlayOkId1));
+            _client.SendPacketAsync(new CharList(_client, _client.SessionKey.PlayOkId1));
         }
 
         private void ValidateAndRestore()
         {
-            L2Player player = _client.AccountChars.FirstOrDefault(filter => filter.CharSlot == _charSlot);
+            L2Player player = _client.AccountCharacters.FirstOrDefault(filter => filter.CharacterSlot == _charSlot);
             
             if (player == null)
             {
@@ -43,8 +43,8 @@ namespace L2dotNET.Network.clientpackets
                 return;
             }
 
-            PlayerService.MarkToRestoreChar(player.ObjId);
-            player.DeleteTime = 0;
+            player.DeleteTime = null;
+            _characterCrudService.Update(player.ToContract());
         }
     }
 }

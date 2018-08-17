@@ -1,5 +1,5 @@
-﻿using L2dotNET.model.player;
-using L2dotNET.Network.serverpackets;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace L2dotNET.Network.clientpackets.ClanAPI
 {
@@ -9,7 +9,7 @@ namespace L2dotNET.Network.clientpackets.ClanAPI
         private readonly int _size;
         private readonly byte[] _picture;
 
-        public RequestExSetPledgeCrestLarge(Packet packet, GameClient client)
+        public RequestExSetPledgeCrestLarge(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             packet.MoveOffset(2);
             _client = client;
@@ -19,8 +19,9 @@ namespace L2dotNET.Network.clientpackets.ClanAPI
                 _picture = packet.ReadByteArrayAlt(_size);
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
+            await Task.FromResult(1);
             //L2Player player = _client.CurrentPlayer;
 
             //if (player.ClanId == 0)
@@ -40,14 +41,14 @@ namespace L2dotNET.Network.clientpackets.ClanAPI
 
             //if ((_size < 0) || (_size > 2176))
             //{
-            //    player.SendSystemMessage(SystemMessage.SystemMessageId.LengthCrestDoesNotMeetStandardRequirements);
+            //    player.SendSystemMessage(SystemMessageId.LengthCrestDoesNotMeetStandardRequirements);
             //    player.SendActionFailed();
             //    return;
             //}
 
             //if ((player.ClanPrivs & L2Clan.CpClRegisterCrest) != L2Clan.CpClRegisterCrest)
             //{
-            //    player.SendSystemMessage(SystemMessage.SystemMessageId.NotAuthorizedToBestowRights);
+            //    player.SendSystemMessage(SystemMessageId.NotAuthorizedToBestowRights);
             //    player.SendActionFailed();
             //    return;
             //}

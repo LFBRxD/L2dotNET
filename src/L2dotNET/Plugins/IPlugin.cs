@@ -1,5 +1,5 @@
-﻿using L2dotNET.model.items;
-using L2dotNET.model.player;
+﻿using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Plugins
 {

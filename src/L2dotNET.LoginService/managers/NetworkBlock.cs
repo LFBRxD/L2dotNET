@@ -2,14 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using log4net;
 using L2dotNET.Utility;
+using NLog;
 
 namespace L2dotNET.LoginService.Managers
 {
     sealed class NetworkBlock
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(NetworkBlock));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private static volatile NetworkBlock _instance;
         private static readonly object SyncRoot = new object();
@@ -70,7 +70,7 @@ namespace L2dotNET.LoginService.Managers
                 }
             }
 
-            Log.Info($"NetworkBlock: {_blocks.Count} blocks.");
+            Log.Info($"{_blocks.Count} network blocks.");
         }
 
         public bool Allowed(string ip)

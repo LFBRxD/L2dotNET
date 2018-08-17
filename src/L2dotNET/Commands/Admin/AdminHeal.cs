@@ -1,5 +1,8 @@
-﻿using L2dotNET.Attributes;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Attributes;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Commands.Admin
@@ -7,7 +10,7 @@ namespace L2dotNET.Commands.Admin
     [Command(CommandName = "heal")]
     class AdminHeal : AAdminCommand
     {
-        protected internal override void Use(L2Player admin, string alias)
+        protected internal override async Task UseAsync(L2Player admin, string alias)
         {
             //healthy -- восстанавливает выбранному чару хп\мп
 
@@ -19,23 +22,27 @@ namespace L2dotNET.Commands.Admin
 
             double hpval = target.MaxHp;
             double mpval = target.MaxMp;
-            target.CurHp = target.MaxHp;
-            target.CurMp = target.MaxMp;
+            target.CharStatus.SetCurrentHp(target.MaxHp);
+            target.CharStatus.SetCurrentMp(target.MaxMp);
 
             StatusUpdate su = new StatusUpdate(target);
-            su.Add(StatusUpdate.CurHp, (int)target.CurHp);
-            su.Add(StatusUpdate.CurMp, (int)target.CurMp);
-            target.SendPacket(su);
+            su.Add(StatusUpdate.CurHp, (int)target.CharStatus.CurrentHp);
+            su.Add(StatusUpdate.CurMp, (int)target.CharStatus.CurrentMp);
+            await target.SendPacketAsync(su);
 
-            SystemMessage sm = new SystemMessage(SystemMessage.SystemMessageId.S2HpRestoredByS1);
+            SystemMessage sm = new SystemMessage(SystemMessageId.S2HpRestoredByS1);
             sm.AddPlayerName(admin.Name);
             sm.AddNumber((int)hpval);
-            target.SendPacket(sm);
+            await target.SendPacketAsync(sm);
 
-            sm = new SystemMessage(SystemMessage.SystemMessageId.S2MpRestoredByS1);
+            sm = new SystemMessage(SystemMessageId.S2MpRestoredByS1);
             sm.AddPlayerName(admin.Name);
             sm.AddNumber((int)mpval);
-            target.SendPacket(sm);
+            await target.SendPacketAsync(sm);
+        }
+
+        public AdminHeal(IServiceProvider serviceProvider) : base(serviceProvider)
+        {
         }
     }
 }

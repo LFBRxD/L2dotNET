@@ -1,7 +1,8 @@
-﻿using L2dotNET.model.player;
-using L2dotNET.templates;
+﻿using System.Threading.Tasks;
+using L2dotNET.Models.Player;
+using L2dotNET.Templates;
 
-namespace L2dotNET.model.npcs.decor
+namespace L2dotNET.Models.Npcs.Decor
 {
     public class L2TownMap : L2StaticObject
     {
@@ -9,14 +10,14 @@ namespace L2dotNET.model.npcs.decor
         {
         }
 
-        public override void NotifyAction(L2Player player)
+        public override async Task NotifyActionAsync(L2Player player)
         {
-            player.SendPacket(TownMap);
+            await player.SendPacketAsync(TownMap);
         }
 
         public override string AsString()
         {
-            return $"L2TownMap:{ObjId} {StaticId}";
+            return $"L2TownMap:{ObjectId} {StaticId}";
         }
     }
 }

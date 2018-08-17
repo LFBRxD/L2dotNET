@@ -1,103 +1,105 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
-using System.Threading;
-using log4net;
+using System.Threading.Tasks;
 using L2dotNET.LoginService.Network;
-using L2dotNET.LoginService.Network.OuterNetwork.ServerPackets;
+using L2dotNET.LoginService.Network.InnerNetwork.ResponsePackets;
 using L2dotNET.Network;
+using L2dotNET.Utility;
+using Microsoft.Extensions.DependencyInjection;
+using NLog;
 
 namespace L2dotNET.LoginService.GSCommunication
 {
     public class ServerThread
     {
-        private readonly ILog _log = LogManager.GetLogger(typeof(ServerThread));
-
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
+        
         private NetworkStream _nstream;
         private TcpClient _client;
-        private byte[] _buffer;
+        private readonly PacketHandler _packetHandler;
+        private readonly ICollection<int> _accountsInGame;
+
 
         public string Wan { get; set; }
         public short Port { get; set; }
-        public short Curp { get; set; }
-        public short Maxp { get; set; } = 1000;
+        public short CurrentPlayers { get; set; }
+        public short MaxPlayers { get; set; } = 1000;
         public string Info { get; set; }
         public bool Connected { get; set; }
         public bool TestMode { get; set; }
         public bool GmOnly { get; set; }
-        public byte Id { get; set; }
+        public byte ServerId { get; set; }
 
-        public void ReadData(TcpClient tcpClient, ServerThreadPool cn)
+        public ServerThread(PacketHandler packetHandler)
+        {
+            _packetHandler = packetHandler;
+            _accountsInGame = new List<int>();
+        }
+
+        public async void ReadData(TcpClient tcpClient, ServerThreadPool cn)
         {
             _nstream = tcpClient.GetStream();
             _client = tcpClient;
+            Connected = true;
 
-            new Thread(Read).Start();
-        }
-
-        public void Read()
-        {
             try
             {
-                _buffer = new byte[2];
-                _nstream.BeginRead(_buffer, 0, 2, OnReceiveCallbackStatic, null);
+                while (true)
+                {
+                    byte[] buffer = new byte[2];
+                    int bytesRead = await _nstream.ReadAsync(buffer, 0, 2);
+
+                    if (bytesRead != 2)
+                    {
+                        throw new Exception("Wrong packet");
+                    }
+
+                    short length = BitConverter.ToInt16(buffer, 0);
+
+                    buffer = new byte[length];
+                    bytesRead = await _nstream.ReadAsync(buffer, 0, length);
+
+                    if (bytesRead != length)
+                    {
+                        throw new Exception("Wrong packet");
+                    }
+
+                    Task.Factory.StartNew(() => _packetHandler.Handle(buffer.ToPacket(), this));
+                }
             }
             catch (Exception e)
             {
-                _log.Error($"ServerThread: {e.Message}");
+                Log.Error($"ServerThread: {e.Message}");
                 Termination();
             }
-        }
-
-        private void OnReceiveCallbackStatic(IAsyncResult result)
-        {
-            try
-            {
-                int rs = _nstream.EndRead(result);
-                if (rs <= 0)
-                    return;
-
-                short length = BitConverter.ToInt16(_buffer, 0);
-                _buffer = new byte[length];
-                _nstream.BeginRead(_buffer, 0, length, OnReceiveCallback, result.AsyncState);
-            }
-            catch (Exception e)
-            {
-                _log.Error($"ServerThread: {e.Message}");
-                Termination();
-            }
-        }
-
-        private void OnReceiveCallback(IAsyncResult result)
-        {
-            _nstream.EndRead(result);
-
-            byte[] buff = new byte[_buffer.Length];
-            _buffer.CopyTo(buff, 0);
-            PacketHandler.Handle(new Packet(1, buff), this);
-            Read();
         }
 
         private void Termination()
         {
-            ServerThreadPool.Instance.Shutdown(Id);
+            LoginServer.ServiceProvider.GetService<ServerThreadPool>().Shutdown(ServerId);
+            Connected = false;
         }
 
-        public void Send(Packet pk)
+        public async Task Send(Packet pk)
         {
-            List<byte> blist = new List<byte>();
-            byte[] db = pk.GetBuffer();
-            short len = (short)db.Length;
-            blist.AddRange(BitConverter.GetBytes(len));
-            blist.AddRange(db);
-            _nstream.Write(blist.ToArray(), 0, blist.Count);
-            _nstream.Flush();
+            byte[] buffer = pk.GetBuffer();
+
+            byte[] lengthInBytes = BitConverter.GetBytes((short)buffer.Length);
+
+            byte[] message = new byte[buffer.Length + 2];
+
+            lengthInBytes.CopyTo(message, 0);
+            buffer.CopyTo(message, 2);
+
+            await _nstream.WriteAsync(message, 0, message.Length);
+            await _nstream.FlushAsync();
         }
 
-        public void Close(Packet pk)
+        public void Close(Packet packet)
         {
-            Send(pk);
-            ServerThreadPool.Instance.Shutdown(Id);
+            Send(packet);
+            LoginServer.ServiceProvider.GetService<ServerThreadPool>().Shutdown(ServerId);
         }
 
         public void Stop()
@@ -109,42 +111,40 @@ namespace L2dotNET.LoginService.GSCommunication
             }
             catch (Exception e)
             {
-                _log.Error($"ServerThread: {e.Message}");
+                Log.Error($"ServerThread: {e.Message}");
             }
 
-            _activeInGame.Clear();
+            _accountsInGame.Clear();
         }
 
-        private readonly List<string> _activeInGame = new List<string>();
-
-        public void AccountInGame(string account, byte status)
+        public void AccountInGame(int accountId, byte status)
         {
             if (status == 1)
             {
-                if (!_activeInGame.Contains(account))
-                    _activeInGame.Add(account);
+                if (!_accountsInGame.Contains(accountId))
+                    _accountsInGame.Add(accountId);
             }
             else
             {
-                if (_activeInGame.Contains(account))
-                    _activeInGame.Remove(account);
+                if (_accountsInGame.Contains(accountId))
+                    _accountsInGame.Remove(accountId);
             }
         }
 
-        public bool LoggedAlready(string account)
+        public bool LoggedAlready(int accountId)
         {
-            return _activeInGame.Contains(account);
+            return _accountsInGame.Contains(accountId);
         }
 
-        public void KickAccount(string account)
+        public void KickAccount(int accountId)
         {
-            _activeInGame.Remove(account);
-            Send(PleaseKickAccount.ToPacket(account));
+            _accountsInGame.Remove(accountId);
+            Send(PleaseKickAccount.ToPacket(accountId));
         }
 
-        public void SendPlayer(LoginClient loginClient, string time)
+        public async Task SendPlayer(LoginClient loginClient)
         {
-            Send(PleaseAcceptPlayer.ToPacket(loginClient.ActiveAccount, time));
+            await Send(PleaseAcceptPlayer.ToPacket(loginClient.ActiveAccount, loginClient.Key));
         }
     }
 }

@@ -1,6 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
-using L2dotNET.model.player;
-using L2dotNET.world;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Models.Status
 {
@@ -13,9 +12,9 @@ namespace L2dotNET.Models.Status
             Character = player;
         }
 
-        public void SetCurrentCp(double newHp)
+        public void SetCurrentCp(double newCp)
         {
-            SetCurrentHp(newHp, true);
+            //SetCurrentHp(newCp, true);
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
@@ -40,7 +39,7 @@ namespace L2dotNET.Models.Status
             }
             
             if (broadcastUpdate)
-                Character.BroadcastStatusUpdate();
+                Character.BroadcastStatusUpdateAsync();
         }
 
         public void ReduceCp(int value)

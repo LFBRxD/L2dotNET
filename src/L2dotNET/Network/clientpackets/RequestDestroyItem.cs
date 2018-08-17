@@ -1,5 +1,8 @@
-﻿using L2dotNET.model.items;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Network.clientpackets
@@ -10,7 +13,7 @@ namespace L2dotNET.Network.clientpackets
         private readonly int _sId;
         private readonly int _num;
 
-        public RequestDestroyItem(Packet packet, GameClient client)
+        public RequestDestroyItem(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _sId = packet.ReadInt();
@@ -19,50 +22,53 @@ namespace L2dotNET.Network.clientpackets
                 _num = 1;
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            if (player.PBlockAct == 1)
+            await Task.Run(() =>
             {
-                player.SendActionFailed();
-                return;
-            }
+                L2Player player = _client.CurrentPlayer;
 
-            if (player.TradeState != 0)
-            {
-                player.SendMessage("You cannot destroy items while trading.");
-                player.SendActionFailed();
-                return;
-            }
+                if (player.PBlockAct == 1)
+                {
+                    player.SendActionFailedAsync();
+                    return;
+                }
 
-            L2Item item = player.GetItemByObjId(_sId);
+                if (player.TradeState != 0)
+                {
+                    player.SendMessageAsync("You cannot destroy items while trading.");
+                    player.SendActionFailedAsync();
+                    return;
+                }
 
-            if (item == null)
-            {
-                player.SendMessage($"null item {_sId}");
-                player.SendActionFailed();
-                return;
-            }
+                L2Item item = player.GetItemByObjId(_sId);
 
-            if (!item.Template.Destroyable)
-            {
-                SystemMessage sm = new SystemMessage(SystemMessage.SystemMessageId.S1S2);
-                sm.AddItemName(item.Template.ItemId);
-                sm.AddString("cannot be destroyed.");
-                player.SendPacket(sm);
-                player.SendActionFailed();
-                return;
-            }
+                if (item == null)
+                {
+                    player.SendMessageAsync($"null item {_sId}");
+                    player.SendActionFailedAsync();
+                    return;
+                }
 
-            //if (item._isEquipped == 1)
-            //{
-            //    int pdollId = player.Inventory.getPaperdollId(item.Template);
-            //    player.setPaperdoll(pdollId, null, true);
-            //    player.broadcastUserInfo();
-            //}
+                if (!item.Template.Destroyable)
+                {
+                    SystemMessage sm = new SystemMessage(SystemMessageId.S1S2);
+                    sm.AddItemName(item.Template.ItemId);
+                    sm.AddString("cannot be destroyed.");
+                    player.SendPacketAsync(sm);
+                    player.SendActionFailedAsync();
+                    return;
+                }
 
-            player.DestroyItemById(item.Template.ItemId, _num);
+                //if (item._isEquipped == 1)
+                //{
+                //    int pdollId = player.Inventory.getPaperdollId(item.Template);
+                //    player.setPaperdoll(pdollId, null, true);
+                //    player.broadcastUserInfo();
+                //}
+
+                player.DestroyItemById(item.Template.ItemId, _num);
+            });
         }
     }
 }

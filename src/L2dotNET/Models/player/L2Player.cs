@@ -1,58 +1,44 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Remoting.Contexts;
+using System.Threading.Tasks;
 using System.Timers;
-using log4net;
 using L2dotNET.DataContracts;
+using L2dotNET.DataContracts.Shared.Enums;
 using L2dotNET.Enums;
-using L2dotNET.model.inventory;
-using L2dotNET.model.items;
-using L2dotNET.model.npcs;
-using L2dotNET.model.npcs.decor;
-using L2dotNET.model.player.General;
-using L2dotNET.model.vehicles;
-using L2dotNET.Models;
+using L2dotNET.Models.Inventory;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Npcs;
+using L2dotNET.Models.Npcs.Decor;
+using L2dotNET.Models.Player.General;
 using L2dotNET.Models.Stats;
 using L2dotNET.Models.Stats.Funcs;
 using L2dotNET.Models.Status;
+using L2dotNET.Models.Vehicles;
 using L2dotNET.Network;
 using L2dotNET.Network.serverpackets;
 using L2dotNET.Services.Contracts;
-using L2dotNET.tables;
-using L2dotNET.tables.multisell;
-using L2dotNET.templates;
-using L2dotNET.tools;
+using L2dotNET.Templates;
+using L2dotNET.Tools;
 using L2dotNET.Utility;
-using L2dotNET.world;
-using Ninject;
+using L2dotNET.World;
+using Microsoft.Extensions.DependencyInjection;
+using NLog;
 
-namespace L2dotNET.model.player
+namespace L2dotNET.Models.Player
 {
-    [Synchronization]
+    
     public class L2Player : L2Character
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(L2Player));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        public L2Player(int objectId, PcTemplate template) : base(objectId, template)
-        {
-            Template = template;
-            Stats = new CharacterStat(this);
-            InitializeCharacterStatus();
-            Calculators = new Models.Stats.Calculator[Models.Stats.Stats.Values.Count()];
-            AddFuncsToNewCharacter();
-        }
+        public readonly ICharacterService _characterService;
 
-        public L2Player() :base(0, null)
-        {
-        }
+        public new PlayerStatus CharStatus => (PlayerStatus) base.CharStatus;
 
-        [Inject]
-        public IPlayerService PlayerService { get; set; } = GameServer.Kernel.Get<IPlayerService>();
+        public AccountContract Account { get; set; }
+        public GameClient Gameclient { get; private set; }
 
-        public new PlayerStatus Status => (PlayerStatus)base.Status;
-
-        public string AccountName { get; set; }
         public ClassId ClassId { get; set; }
         public L2PartyRoom PartyRoom { get; set; }
         public L2Party Party { get; set; }
@@ -61,42 +47,38 @@ namespace L2dotNET.model.player
         public HairColor HairColor { get; set; }
         public Face Face { get; set; }
         public bool WhisperBlock { get; set; }
-        public GameClient Gameclient { get; set; }
-        public long Exp { get; set; }
+        public long Experience { get; set; }
         public long ExpOnDeath { get; set; }
         public long ExpAfterLogin { get; set; }
         public int Sp { get; set; }
-        public override int MaxHp => Stats.MaxHp;
-        public int MaxCp => Stats.MaxCp;
-        public double CurCp
+        public double CurrentCp
         {
-            get => Status.CurrentCp;
-            set => Status.SetCurrentCp(value);
+            get => CharStatus.CurrentCp;
+            set => CharStatus.SetCurrentCp(value);
         }
-        public override int MaxMp => Stats.MaxMp;
         public int Karma { get; set; }
         public int PvpKills { get; set; }
-        public long DeleteTime { get; set; }
+        public DateTime? DeleteTime { get; set; }
         public int CanCraft { get; set; }
         public int PkKills { get; set; }
-        public int RecLeft { get; set; }
-        public int RecHave { get; set; }
+        public int RecomendationsLeft { get; set; }
+        public int RecomandationsHave { get; set; }
         public int AccessLevel { get; set; }
-        public int Online { get; set; }
+        public int Online { get; private set; }
         public int OnlineTime { get; set; }
-        public int CharSlot { get; set; }
+        public int CharacterSlot { get; set; }
         public int CurrentWeight { get; set; }
-        public double CollRadius { get; set; }
-        public double CollHeight { get; set; }
+        public double CollisionRadius { get; set; }
+        public double CollisionHeight { get; set; }
         public int CursedWeaponLevel { get; set; }
-        public long LastAccess { get; set; }
+        public DateTime? LastAccess { get; set; }
         public int IsIn7SDungeon { get; set; }
-        public int PunishLevel { get; set; }
-        public int PunishTimer { get; set; }
+        public int? PunishLevel { get; set; }
+        public DateTime? PunishTime { get; set; }
         public int PowerGrade { get; set; }
-        public int Nobless { get; set; }
-        public int Hero { get; set; }
-        public long LastRecomDate { get; set; }
+        public bool Nobless { get; set; }
+        public bool Hero { get; set; }
+        public DateTime? LastRecomendationDate { get; set; }
         public PcInventory Inventory { get; set; }
         public dynamic SessionData { get; set; }
         public new PcTemplate Template { get; set; }
@@ -105,9 +87,162 @@ namespace L2dotNET.model.player
         public byte Noblesse = 0;
         public byte Heroic = 0;
 
+        public bool Diet = false;
+        public int PenaltyWeight;
+        public int PenaltyGrade = 0;
+        public int CurrentFocusEnergy = 0;
+
+        public int ItemLimitInventory = 80,
+                   ItemLimitSelling = 5,
+                   ItemLimitBuying = 5,
+                   ItemLimitRecipeDwarven = 50,
+                   ItemLimitRecipeCommon = 50,
+                   ItemLimitWarehouse = 120,
+                   ItemLimitClanWarehouse = 150,
+                   ItemLimitExtra = 0,
+                   ItemLimitQuest = 20;
+
+        public L2Npc FolkNpc;
+        public int LastX1 = -4;
+        public int LastY1;
+
+        private Timer _timerTooFar;
+        public string Locale = "en";
+
+        public int PCreateCommonItem = 0;
+        public int PCreateItem = 0;
+        public List<L2Shortcut> Shortcuts = new List<L2Shortcut>();
+        public int ZoneId = -1;
+        public int Obsx = -1;
+        public int Obsy;
+        public int Obsz;
+
+        // arrow, bolt
+        public L2Item SecondaryWeaponSupport;
+
+        public override L2Item ActiveWeapon => null;
+        public List<int> AutoSoulshots = new List<int>();
+        public List<int> SetKeyItems;
+        public int SetKeyId;
+
+        public int MountType;
+        public NpcTemplate MountedTemplate;
+        public int TradeState;
+        public SortedList<int, int> CurrentTrade;
+        public int Sstt;
+        private DateTime _pingTimeout;
+        private int _lastPingId;
+        public int Ping = -1;
+        public int AttackingId;
+
+        private L2Chair _chair;
+        public L2Boat Boat;
+        public int BoatX;
+        public int BoatY;
+        public int BoatZ;
+
+        public PcTemplate BaseClass;
+        public PcTemplate ActiveClass;
+
+        private ActionFailed _af;
+
+        public int ViewingAdminPage;
+        public int ViewingAdminTeleportGroup = -1;
+        public int TeleportPayId;
+        public int LastMinigameScore;
+        public short ClanType;
+        public int Fame;
+
+
+        private Timer _sitTime;
+        private bool _isSitting;
+
+        private Timer _petSummonTime,
+                      _nonpetSummonTime;
+
+        private int _petId = -1;
+        private L2Item _petControlItem;
+
+        public bool IsInOlympiad = false;
+
+        public L2Item EnchantScroll,
+                      EnchantItem,
+                      EnchantStone;
+
+        public byte EnchantState = 0;
+
+        // 0 cls, 1 violet, 2 blink
+        public byte PvPStatus;
+
+        public bool IsCursed = false;
+        public string PenaltyClanCreate = "0";
+        public string PenaltyClanJoin = "0";
+        public byte PartyState;
+        public L2Player Requester;
+        public int ItemDistribution;
+
+        public int VehicleId => Boat?.ObjectId ?? 0;
+
+        public L2Player(PcTemplate template, int objectId) : base(objectId, template)
+        {
+            Template = template;
+            _characterService = GameServer.ServiceProvider.GetService<ICharacterService>();
+            CharacterStat = new CharacterStat(this);
+            AddFuncsToNewCharacter();
+            InitializeCharacterStatus();
+
+            Inventory = new PcInventory(this);
+            Title = string.Empty;
+            Experience = 0;
+            Level = 1;
+            ClassId = template.ClassId;
+            BaseClass = template;
+            ActiveClass = template;
+            CharStatus.CurrentCp = MaxCp;
+            CharStatus.SetCurrentHp(MaxHp, false);
+            CharStatus.SetCurrentMp(MaxMp, false);
+            X = template.SpawnX;
+            Y = template.SpawnY;
+            Z = template.SpawnZ;
+            LastAccess =  DateTime.UtcNow;
+
+            if (template.DefaultInventory != null)
+            {
+                //foreach (PC_item i in template._items)
+                //{
+                //    if (!i.item.isStackable())
+                //    {
+                //        for (long s = 0; s < i.count; s++)
+                //        {
+                //            L2Item item = new L2Item(i.item);
+                //            item.Enchant = i.enchant;
+                //            if (i.lifetime != -1)
+                //                item.AddLimitedHour(i.lifetime);
+
+                //            item.Location = L2Item.L2ItemLocation.inventory;
+                //            player.Inventory.addItem(item, false, false);
+
+                //            if (i.equip)
+                //            {
+                //                int pdollId = player.Inventory.getPaperdollId(item.Template);
+                //                player.setPaperdoll(pdollId, item, false);
+                //            }
+                //        }
+                //    }
+                //    else
+                //        player.addItem(i.item.ItemID, i.count);
+                //}
+            }
+        }
+
+        public L2Player(ICharacterService characterService) :base(0, null)
+        {
+            _characterService = characterService;
+        }
+
         public override void InitializeCharacterStatus()
         {
-            base.Status = new PlayerStatus(this);
+            base.CharStatus = new PlayerStatus(this);
         }
 
         public byte PrivateStoreType = 0;
@@ -147,35 +282,28 @@ namespace L2dotNET.model.player
             return false;
         }
 
-        public override void SendPacket(GameserverPacket pk)
+        public override async Task SendPacketAsync(GameserverPacket gameserverPacket)
         {
-            Gameclient.SendPacket(pk);
+            await Gameclient.SendPacketAsync(gameserverPacket);
         }
 
-        private ActionFailed _af;
-
-        public override void SendActionFailed()
+        public override async Task SendActionFailedAsync()
         {
             if (_af == null)
                 _af = new ActionFailed();
 
-            SendPacket(_af);
+            await SendPacketAsync(_af);
         }
 
-        public override void SendSystemMessage(SystemMessage.SystemMessageId msgId)
+        public override async Task SendSystemMessage(SystemMessageId msgId)
         {
-            SendPacket(new SystemMessage(msgId));
+            await SendPacketAsync(new SystemMessage(msgId));
         }
 
-        public int PenaltyWeight;
-        public int PenaltyGrade = 0;
-
-        public override void SendMessage(string p)
+        public override async Task SendMessageAsync(string p)
         {
-            SendPacket(new SystemMessage(SystemMessage.SystemMessageId.S1).AddString(p));
+            await SendPacketAsync(new SystemMessage(SystemMessageId.S1).AddString(p));
         }
-
-        public int CurrentFocusEnergy = 0;
 
         public int GetForceIncreased()
         {
@@ -184,20 +312,18 @@ namespace L2dotNET.model.player
 
         public void UpdateReuse()
         {
-            SendPacket(new SkillCoolTime(this));
+            SendPacketAsync(new SkillCoolTime(this));
         }
 
         public override void AddFuncsToNewCharacter()
         {
             base.AddFuncsToNewCharacter();
 
-            AddStatFunc(new FuncMaxCpMul());
+            CharacterStat.AddStatFunction(FuncMaxCpMul.Instance);
 
             //Henna stuff go here
         }
 
-        public bool Diet = false;
-        
         public void OnGameInit()
         {
             //CStatsInit();
@@ -209,9 +335,8 @@ namespace L2dotNET.model.player
         {
             if (file.EndsWithIgnoreCase(".htm"))
             {
-                SendPacket(new NpcHtmlMessage(this, $"./html/ {file}", o.ObjId, 0));
-                L2Npc npc = o as L2Npc;
-                if (npc != null)
+                SendPacketAsync(new NpcHtmlMessage(this, $"./html/{file}", o.ObjectId, 0));
+                if (o is L2Npc npc)
                     FolkNpc = npc;
             }
             else
@@ -222,9 +347,9 @@ namespace L2dotNET.model.player
         {
             if (file.EndsWithIgnoreCase(".htm"))
             {
-                NpcHtmlMessage htm = new NpcHtmlMessage(this, file, npc.ObjId, 0);
+                NpcHtmlMessage htm = new NpcHtmlMessage(this, file, npc.ObjectId, 0);
                 htm.Replace("<?quest_id?>", questId);
-                SendPacket(htm);
+                SendPacketAsync(htm);
                 FolkNpc = npc;
             }
             else
@@ -234,65 +359,48 @@ namespace L2dotNET.model.player
         public void UpdateAndBroadcastStatus(int broadcastType)
         {
             if (broadcastType == 1)
-                SendPacket(new UserInfo(this));
+                SendPacketAsync(new UserInfo(this));
             else if (broadcastType == 2)
             {
-                BroadcastUserInfo();
+                BroadcastUserInfoAsync();
             }
         }
 
         public void ShowHtmPlain(string plain, L2Object o)
         {
-            SendPacket(new NpcHtmlMessage(this, plain, o?.ObjId ?? -1, true));
+            SendPacketAsync(new NpcHtmlMessage(this, plain, o?.ObjectId ?? -1, true));
             if (o is L2Npc)
                 FolkNpc = (L2Npc)o;
         }
 
         public void SendQuestList()
         {
-            SendPacket(new QuestList(this));
+            SendPacketAsync(new QuestList(this));
         }
 
         public void AddExpSp(int exp, int sp, bool msg)
         {
-            SystemMessage sm = new SystemMessage(SystemMessage.SystemMessageId.YouEarnedS1ExpAndS2Sp);
+            SystemMessage sm = new SystemMessage(SystemMessageId.YouEarnedS1ExpAndS2Sp);
             sm.AddNumber(exp);
             sm.AddNumber(sp);
-            SendPacket(sm);
+            SendPacketAsync(sm);
 
-            Exp += exp;
+            Experience += exp;
             Sp += sp;
             //Need to Level up ?
-            if(Level != Experience.GetLevel(Exp))
+            if(Level != Player.Experience.GetLevel(Experience))
             {
-                Level = Experience.GetLevel(Exp);
-                this.BroadcastPacket(new SocialAction(ObjId, 15));
-                this.SendPacket(new SystemMessage(SystemMessage.SystemMessageId.YouIncreasedYourLevel));
+                Level = Player.Experience.GetLevel(Experience);
+                this.BroadcastPacketAsync(new SocialAction(ObjectId, 15));
+                this.SendPacketAsync(new SystemMessage(SystemMessageId.YouIncreasedYourLevel));
             }
 
             StatusUpdate su = new StatusUpdate(this);
-            su.Add(StatusUpdate.Exp, (int)Exp);
+            su.Add(StatusUpdate.Exp, (int)Experience);
             su.Add(StatusUpdate.Sp, Sp);
             su.Add(StatusUpdate.Level, Level);
-            SendPacket(su);
+            SendPacketAsync(su);
         }
-        
-        public int ItemLimitInventory = 80,
-                   ItemLimitSelling = 5,
-                   ItemLimitBuying = 5,
-                   ItemLimitRecipeDwarven = 50,
-                   ItemLimitRecipeCommon = 50,
-                   ItemLimitWarehouse = 120,
-                   ItemLimitClanWarehouse = 150,
-                   ItemLimitExtra = 0,
-                   ItemLimitQuest = 20;
-
-        public L2Npc FolkNpc;
-        public int LastX1 = -4;
-        public int LastY1;
-
-        private Timer _timerTooFar;
-        public string Locale = "en";
 
         public void Timer()
         {
@@ -306,105 +414,11 @@ namespace L2dotNET.model.player
         {
             ValidateVisibleObjects(X, Y, true);
         }
-
-        public int PCreateCommonItem = 0;
-        public int PCreateItem = 0;
-        public List<L2Recipe> RecipeBook = new List<L2Recipe>();
-
-        public void RegisterRecipe(L2Recipe newr, bool updDb, bool cleanup)
-        {
-            lock (RecipeBook)
-            {
-                if (cleanup)
-                    RecipeBook.Clear();
-
-                RecipeBook.Add(newr);
-
-                if (updDb)
-                {
-                    //SQL_Block sqb = new SQL_Block("user_recipes");
-                    //sqb.param("ownerId", ObjID);
-                    //sqb.param("recid", newr.RecipeID);
-                    //sqb.param("iclass", ActiveClass.id);
-                    //sqb.sql_insert(false);
-                }
-            }
-        }
-
-        public void db_restoreRecipes()
-        {
-            //MySqlConnection connection = SQLjec.getInstance().conn();
-            //MySqlCommand cmd = connection.CreateCommand();
-
-            //connection.Open();
-
-            //cmd.CommandText = $"SELECT recid FROM user_recipes WHERE ownerId={ObjID} AND iclass={ActiveClass.id} ORDER BY tact ASC";
-            //cmd.CommandType = CommandType.Text;
-
-            //MySqlDataReader reader = cmd.ExecuteReader();
-
-            //while (reader.Read())
-            //{
-            //    int recid = reader.GetInt32("recid");
-
-            //    L2Recipe rec = RecipeTable.getInstance().getById(recid);
-            //    if (rec != null)
-            //    {
-            //        if (_recipeBook == null)
-            //            _recipeBook = new List<L2Recipe>();
-
-            //        _recipeBook.Add(rec);
-            //    }
-            //}
-
-            //reader.Close();
-            //connection.Close();
-        }
-
-        public void UnregisterRecipe(L2Recipe rec, bool updDb)
-        {
-            lock (RecipeBook)
-            {
-                foreach (L2Recipe r in RecipeBook.Where(r => r.RecipeId == rec.RecipeId))
-                {
-                    if (updDb)
-                    {
-                        //MySqlConnection connection = SQLjec.getInstance().conn();
-                        //MySqlCommand cmd = connection.CreateCommand();
-
-                        //connection.Open();
-
-                        //string query = string.Format(
-                        //    "DELETE FROM user_recipes WHERE ownerId='{0}' AND recid='{1}' AND iclass='{2}'",
-                        //    ObjID,
-                        //    r.RecipeID,
-                        //    ActiveClass.id);
-
-                        //cmd.CommandText = query;
-                        //cmd.CommandType = CommandType.Text;
-                        //cmd.ExecuteNonQuery();
-
-                        //connection.Close();
-                    }
-
-                    RecipeBook.Remove(r);
-
-                    SendPacket(new RecipeBookItemList(this, rec.Iscommonrecipe));
-                    break;
-                }
-            }
-        }
-
+        
         public bool IsAlikeDead()
         {
             return false;
         }
-
-        public List<L2Shortcut> Shortcuts = new List<L2Shortcut>();
-        public int ZoneId = -1;
-        public int Obsx = -1;
-        public int Obsy;
-        public int Obsz;
 
         public void RegisterShortcut(int slot, int page, int type, int id, int level, int characterType)
         {
@@ -429,7 +443,7 @@ namespace L2dotNET.model.player
                 lock (Shortcuts)
                     Shortcuts.Add(sc);
 
-                SendPacket(new ShortCutRegister(sc));
+                SendPacketAsync(new ShortCutRegister(sc));
 
                 //SQL_Block sqb = new SQL_Block("user_shortcuts");
                 //sqb.param("ownerId", ObjID);
@@ -443,9 +457,6 @@ namespace L2dotNET.model.player
                 //sqb.sql_insert(false);
             }
         }
-
-        public PcTemplate BaseClass;
-        public PcTemplate ActiveClass;
 
         public bool SubActive()
         {
@@ -496,14 +507,14 @@ namespace L2dotNET.model.player
         public void AddAdena(int count, bool sendMessage)
         {
             if (sendMessage)
-                SendPacket(new SystemMessage(SystemMessage.SystemMessageId.EarnedS1Adena).AddNumber(count));
+                SendPacketAsync(new SystemMessage(SystemMessageId.EarnedS1Adena).AddNumber(count));
 
             if (count <= 0)
                 return;
 
             InventoryUpdate iu = new InventoryUpdate();
             iu.AddNewItem(Inventory.AddItem(57, count, this));
-            SendPacket(iu);
+            SendPacketAsync(iu);
         }
 
         public override string AsString()
@@ -513,40 +524,40 @@ namespace L2dotNET.model.player
 
         public override void OnRemObject(L2Object obj)
         {
-            SendPacket(new DeleteObject(obj.ObjId));
+            SendPacketAsync(new DeleteObject(obj.ObjectId));
         }
 
         public override void OnAddObject(L2Object obj, GameserverPacket pk, string msg = null)
         {
             if (obj is L2Npc)
-                SendPacket(new NpcInfo((L2Npc)obj));
+                SendPacketAsync(new NpcInfo((L2Npc)obj));
             else
             {
                 if (obj is L2Player)
                 {
-                    SendPacket(new CharInfo((L2Player)obj));
+                    SendPacketAsync(new CharInfo((L2Player)obj));
 
                     if (msg != null)
-                        ((L2Player)obj).SendMessage(msg);
+                        ((L2Player)obj).SendMessageAsync(msg);
                 }
                 else
                 {
                     if (obj is L2Item)
-                        SendPacket(pk ?? new SpawnItem((L2Item)obj));
+                        SendPacketAsync(pk ?? new SpawnItem((L2Item)obj));
                     else
                     {
                        
                         {
                             if (obj is L2Chair)
-                                SendPacket(new StaticObject((L2Chair)obj));
+                                SendPacketAsync(new StaticObject((L2Chair)obj));
                             else
                             {
                                 if (obj is L2StaticObject)
-                                    SendPacket(new StaticObject((L2StaticObject)obj));
+                                    SendPacketAsync(new StaticObject((L2StaticObject)obj));
                                 else
                                 {
                                     if (obj is L2Boat)
-                                        SendPacket(new VehicleInfo((L2Boat)obj));
+                                        SendPacketAsync(new VehicleInfo((L2Boat)obj));
                                 }
                             }
                         }
@@ -555,30 +566,25 @@ namespace L2dotNET.model.player
             }
         }
 
-        public override void BroadcastStatusUpdate()
+        public override async Task BroadcastStatusUpdateAsync()
         {
-            StatusUpdate su = new StatusUpdate(this);
-            su.Add(StatusUpdate.CurHp, (int)CurHp);
-            su.Add(StatusUpdate.CurMp, (int)CurMp);
-            su.Add(StatusUpdate.CurCp, (int)CurCp);
-            su.Add(StatusUpdate.MaxCp, MaxCp);
-            SendPacket(su);
+            StatusUpdate statusUpdate = new StatusUpdate(this);
+            statusUpdate.Add(StatusUpdate.CurHp, (int)CharStatus.CurrentHp);
+            statusUpdate.Add(StatusUpdate.CurMp, (int)CharStatus.CurrentMp);
+            statusUpdate.Add(StatusUpdate.CurCp, (int)CurrentCp);
+            statusUpdate.Add(StatusUpdate.MaxCp, MaxCp);
+            await SendPacketAsync(statusUpdate);
         }
 
-        public void BroadcastCharInfo()
+        public override async Task BroadcastUserInfoAsync()
         {
-            foreach (L2Player player in L2World.Instance.GetPlayers().Where(player => player != this))
-                player.SendPacket(new CharInfo(this));
-        }
-
-        public override void BroadcastUserInfo()
-        {
-            SendPacket(new UserInfo(this));
+            await SendPacketAsync(new UserInfo(this));
 
             //if (getPolyType() == PolyType.NPC)
             //    Broadcast.toKnownPlayers(this, new AbstractNpcInfo.PcMorphInfo(this, getPolyTemplate()));
             //else
-            BroadcastCharInfo();
+            await Task.WhenAll(L2World.GetPlayers().Where(player => player != this)
+                .Select(player => player.SendPacketAsync(new CharInfo(this))));
         }
 
         public override void AddKnownObject(L2Object obj)
@@ -593,7 +599,7 @@ namespace L2dotNET.model.player
             //else
             //{
             // send object info to player
-            obj.SendInfo(this);
+            obj.SendInfoAsync(this);
 
             //         if (obj is L2Character)
             //{
@@ -605,25 +611,29 @@ namespace L2dotNET.model.player
             //     }
         }
 
-        public override void DeleteMe()
+        public void SetOnline(GameClient client)
         {
-            CleanUp();
-            //Store();
-            base.DeleteMe();
+            Online = 1;
+            client.CurrentPlayer = this;
+            Gameclient = client;
+            L2World.AddPlayer(this);
         }
 
-        public void CleanUp()
+        public async Task SetOffline()
         {
-            if (!IsRestored)
-                return;
+            Online = 0;
 
             Party?.Leave(this);
 
-            Online = 0;
-            PlayerService.UpdatePlayer(this);
-            L2World.Instance.RemovePlayer(this);
-            DecayMe();
+            if (CharMovement.IsMoving)
+            {
+                CharMovement.UpdatePosition();
+                CharMovement.NotifyStopMove();
+            }
 
+            await _characterService.UpdatePlayer(this);
+            L2World.RemovePlayer(this);
+            DecayMe();
         }
 
         public bool HasItem(int itemId, int count)
@@ -631,7 +641,7 @@ namespace L2dotNET.model.player
             return Inventory.Items.Where(item => item.Template.ItemId == itemId).Any(item => item.Count >= count);
         }
 
-        public override void SendInfo(L2Player player)
+        public override async Task SendInfoAsync(L2Player player)
         {
             //if (this.Boa isInBoat())
             //    getPosition().set(getBoat().getPosition());
@@ -640,7 +650,7 @@ namespace L2dotNET.model.player
             //    activeChar.sendPacket(new AbstractNpcInfo.PcMorphInfo(this, getPolyTemplate()));
             //else
             //{
-            player.SendPacket(new CharInfo(this));
+            await player.SendPacketAsync(new CharInfo(this));
 
             if (_isSitting)
             {
@@ -684,7 +694,7 @@ namespace L2dotNET.model.player
             //}
         }
 
-        public override void SetTarget(L2Character newTarget)
+        public override async Task SetTargetAsync(L2Character newTarget)
         {
             if (newTarget != null)
             {
@@ -699,77 +709,70 @@ namespace L2dotNET.model.player
                 if (oldTarget.Equals(newTarget))
                     return;
 
-                oldTarget?.Status.RemoveStatusListener(this);
+                oldTarget?.CharStatus.RemoveStatusListener(this);
             }
 
             if (newTarget is L2StaticObject)
             {
-                SendPacket(new MyTargetSelected(newTarget.ObjId, 0));
-                SendPacket(new StaticObject((L2StaticObject) newTarget));
+                await SendPacketAsync(new MyTargetSelected(newTarget.ObjectId, 0));
+                await SendPacketAsync(new StaticObject((L2StaticObject) newTarget));
             }
             else
             {
                 if (newTarget != null)
                 {
-                    if (newTarget.ObjId != ObjId)
-                        SendPacket(new ValidateLocation(newTarget));
+                    if (newTarget.ObjectId != ObjectId)
+                        await SendPacketAsync(new ValidateLocation(newTarget));
 
-                    SendPacket(new MyTargetSelected(newTarget.ObjId, 0));
+                    await SendPacketAsync(new MyTargetSelected(newTarget.ObjectId, Level - newTarget.Level));
 
-                    newTarget.Status.AddStatusListener(this);
+                    newTarget.CharStatus.AddStatusListener(this);
 
                     StatusUpdate su = new StatusUpdate(newTarget);
                     su.Add(StatusUpdate.MaxHp, newTarget.MaxHp);
-                    su.Add(StatusUpdate.CurHp, (int)newTarget.CurHp);
-                    SendPacket(su);
+                    su.Add(StatusUpdate.CurHp, (int)newTarget.CharStatus.CurrentHp);
+                    await SendPacketAsync(su);
 
-                    BroadcastPacket(su, false);
+                    await BroadcastPacketAsync(su, false);
                 }
                 
             }
 
             if (newTarget == null && Target != null)
             {
-                BroadcastPacket(new TargetUnselected(this));
+                await BroadcastPacketAsync(new TargetUnselected(this));
             }
 
 
-            base.SetTarget(newTarget);
+            base.SetTargetAsync(newTarget);
         }
 
-        public override void OnAction(L2Player player)
+        public override async Task OnActionAsync(L2Player player)
         {
             if (player.Target != this)
-                player.SetTarget(this);
+                await player.SetTargetAsync(this);
             else
             {
-                player.SendActionFailed();
+                await player.SendActionFailedAsync();
                 //follow
             }
         }
 
-        public int ViewingAdminPage;
-        public int ViewingAdminTeleportGroup = -1;
-        public int TeleportPayId;
-        public int LastMinigameScore;
-        public short ClanType;
-        public int Fame;
-
-        public void ShowHtmAdmin(string val, bool plain)
+        public async Task ShowHtmAdminAsync(string val, bool plain)
         {
-            SendPacket(new TutorialShowHtml(this, val, true));
+            await SendPacketAsync(new NpcHtmlMessage(this, val, this.ObjectId));
 
             ViewingAdminPage = 1;
         }
 
         public void ShowHtmBbs(string val)
         {
-            ShowBoard.SeparateAndSend(val, this);
+            ShowBoard.SeparateAndSendAsync(val, this);
         }
 
         public void SendItemList(bool open = false)
         {
-            SendPacket(new ItemList(this, open));
+            SendPacketAsync(new ItemList(this, open));
             // SendPacket(new ExQuestItemList(this));
         }
 
@@ -793,7 +796,7 @@ namespace L2dotNET.model.player
 
             StatusUpdate su = new StatusUpdate(this);
             su.Add(StatusUpdate.CurLoad, CurrentWeight);
-            SendPacket(su);
+            SendPacketAsync(su);
 
             int weightproc = (total * 1000) / 100; //max weight
 
@@ -828,7 +831,7 @@ namespace L2dotNET.model.player
 
             PenaltyWeight = newWeightPenalty;
 
-            SendPacket(new EtcStatusUpdate(this));
+            SendPacketAsync(new EtcStatusUpdate(this));
         }
 
         public bool CheckFreeWeight(int weight)
@@ -849,29 +852,12 @@ namespace L2dotNET.model.player
 
         public override void UpdateAbnormalEventEffect()
         {
-            BroadcastPacket(new ExBrExtraUserInfo(ObjId, AbnormalBitMaskEvent));
+            BroadcastPacketAsync(new ExBrExtraUserInfo(ObjectId, AbnormalBitMaskEvent));
         }
 
         public override void UpdateAbnormalExEffect()
         {
-            BroadcastUserInfo();
-        }
-
-        public string PenaltyClanCreate = "0";
-        public string PenaltyClanJoin = "0";
-
-        public void setPenalty_ClanCreate(DateTime time, bool sql)
-        {
-            PenaltyClanCreate = DateTime.Now < time ? time.ToString("yyyy-MM-dd HH-mm-ss") : "0";
-
-            if (sql) { }
-        }
-
-        public void setPenalty_ClanJoin(DateTime time, bool sql)
-        {
-            PenaltyClanJoin = DateTime.Now < time ? time.ToString("yyyy-MM-dd HH-mm-ss") : "0";
-
-            if (sql) { }
+            BroadcastUserInfoAsync();
         }
 
         public bool IsRestored;
@@ -890,7 +876,7 @@ namespace L2dotNET.model.player
             IsRestored = true;
         }
 
-        public void db_restoreShortcuts()
+        public void DB_RestoreShortcuts()
         {
             //MySqlConnection connection = SQLjec.getInstance().conn();
             //MySqlCommand cmd = connection.CreateCommand();
@@ -918,19 +904,13 @@ namespace L2dotNET.model.player
             //reader.Close();
             //connection.Close();
         }
-        
-        public bool IsCursed = false;
-
-        public byte PartyState;
-        public L2Player Requester;
-        public int ItemDistribution;
 
         public void PendToJoinParty(L2Player asker, int askerItemDistribution)
         {
             PartyState = 1;
             Requester = asker;
             Requester.ItemDistribution = askerItemDistribution;
-            SendPacket(new AskJoinParty(asker.Name, askerItemDistribution));
+            SendPacketAsync(new AskJoinParty(asker.Name, askerItemDistribution));
         }
 
         public void ClearPend()
@@ -939,18 +919,9 @@ namespace L2dotNET.model.player
             Requester = null;
         }
 
-        public bool IsInOlympiad = false;
-        public L2Item EnchantScroll,
-                      EnchantItem,
-                      EnchantStone;
-        public byte EnchantState = 0;
-
-        // 0 cls, 1 violet, 2 blink
-        public byte PvPStatus;
-
         public byte GetEnchantValue()
         {
-            int val = Inventory.Paperdoll?[inventory.Inventory.PaperdollRhand]?.Enchant ?? 0;
+            int val = Inventory.Paperdoll?[Models.Inventory.Inventory.PaperdollRhand]?.Enchant ?? 0;
 
             if (MountType > 0)
                 return 0;
@@ -965,24 +936,19 @@ namespace L2dotNET.model.player
         {
             int color = 0;
 
-            SendPacket(new MyTargetSelected(target.ObjId, color));
+            SendPacketAsync(new MyTargetSelected(target.ObjectId, color));
         }
 
         public override void OnOldTargetSelection(L2Object target)
         {
             double dis = Calcs.CalculateDistance(this, target, true);
             if (dis < 151)
-                target.NotifyAction(this);
+                target.NotifyActionAsync(this);
             else
-                TryMoveTo(target.X, target.Y, target.Z);
+                CharMovement.MoveTo(target.X, target.Y, target.Z);
 
-            SendActionFailed();
+            SendActionFailedAsync();
         }
-
-        private Timer _petSummonTime,
-                      _nonpetSummonTime;
-        private int _petId = -1;
-        private L2Item _petControlItem;
 
         public void PetSummon(L2Item item, int npcId, bool isPet = true)
         {
@@ -999,7 +965,7 @@ namespace L2dotNET.model.player
                 }
 
                 _petSummonTime.Enabled = true;
-                SendSystemMessage(SystemMessage.SystemMessageId.SummonAPet);
+                SendSystemMessage(SystemMessageId.SummonAPet);
             }
             else
             {
@@ -1018,8 +984,8 @@ namespace L2dotNET.model.player
             _petId = npcId;
             _petControlItem = item;
 
-            BroadcastPacket(new MagicSkillUse(this, this, 1111, 1, 5000));
-            SendPacket(new SetupGauge(ObjId, SetupGauge.SgColor.Blue, 4900));
+            BroadcastPacketAsync(new MagicSkillUse(this, this, 1111, 1, 5000));
+            SendPacketAsync(new SetupGauge(ObjectId, SetupGauge.SgColor.Blue, 4900));
         }
 
         private void PetSummonEnd(object sender, ElapsedEventArgs e)
@@ -1044,7 +1010,7 @@ namespace L2dotNET.model.player
 
             //_nonpetSummonTime.Enabled = false;
         }
-
+        /*
         public override bool CantMove()
         {
             if ((_petSummonTime != null) && _petSummonTime.Enabled)
@@ -1053,7 +1019,7 @@ namespace L2dotNET.model.player
                 return true;
 
             return base.CantMove();
-        }
+        }*/
 
         public override L2Character[] GetPartyCharacters()
         {
@@ -1065,7 +1031,7 @@ namespace L2dotNET.model.player
             if (Party == null)
                 return chars.ToArray();
 
-            foreach (L2Player pl in Party.Members.Where(pl => pl.ObjId != ObjId))
+            foreach (L2Player pl in Party.Members.Where(pl => pl.ObjectId != ObjectId))
             {
                 chars.Add(pl);
             }
@@ -1083,10 +1049,7 @@ namespace L2dotNET.model.player
             return _isSitting;
         }
 
-        private Timer _sitTime;
-        private bool _isSitting;
-
-        public void Sit()
+        public async Task SitAsync()
         {
             if (_sitTime == null)
             {
@@ -1098,13 +1061,13 @@ namespace L2dotNET.model.player
             }
 
             _sitTime.Enabled = true;
-            BroadcastPacket(new ChangeWaitType(this, ChangeWaitType.Sit));
+            await BroadcastPacketAsync(new ChangeWaitType(this, ChangeWaitType.Sit));
         }
 
-        public void Stand()
+        public async Task StandAsync()
         {
             _sitTime.Enabled = true;
-            BroadcastPacket(new ChangeWaitType(this, ChangeWaitType.Stand));
+            await BroadcastPacketAsync(new ChangeWaitType(this, ChangeWaitType.Stand));
             //TODO stop relax effect
         }
 
@@ -1120,17 +1083,11 @@ namespace L2dotNET.model.player
             _chair = null;
         }
 
-        private L2Chair _chair;
-        public L2Boat Boat;
-        public int BoatX;
-        public int BoatY;
-        public int BoatZ;
-
         public void SetChair(L2Chair chairObj)
         {
             _chair = chairObj;
             _chair.IsUsedAlready = true;
-            BroadcastPacket(new ChairSit(ObjId, chairObj.StaticId));
+            BroadcastPacketAsync(new ChairSit(ObjectId, chairObj.StaticId));
         }
 
         public bool IsOnShip()
@@ -1143,41 +1100,36 @@ namespace L2dotNET.model.player
             return false;
         }
 
-        // arrow, bolt
-        public L2Item SecondaryWeaponSupport;
-
-        public override L2Item ActiveWeapon => null;
-
         public override void AbortAttack()
         {
             base.AbortAttack();
         }
 
-        public override void DoAttack(L2Character target)
+        public override async Task DoAttackAsync(L2Character target)
         {
-            if (target == null)
+           /* if (target == null)
             {
-                SendMessage("null");
-                SendActionFailed();
+                await SendMessageAsync("null");
+                await SendActionFailedAsync();
                 return;
             }
 
             if (target.Dead)
             {
-                SendMessage("dead");
-                SendActionFailed();
+                await SendMessageAsync("dead");
+                await SendActionFailedAsync();
                 return;
             }
 
             if ((AttackToHit != null) && AttackToHit.Enabled)
             {
-                SendActionFailed();
+                await SendActionFailedAsync();
                 return;
             }
 
             if ((AttackToEnd != null) && AttackToEnd.Enabled)
             {
-                SendActionFailed();
+                await SendActionFailedAsync();
                 return;
             }
 
@@ -1199,21 +1151,21 @@ namespace L2dotNET.model.player
 
             if (!Calcs.CheckIfInRange((int)dist, this, target, true))
             {
-                SendMessage($"too far {dist}");
-                TryMoveToAndHit(target.X, target.Y, target.Z,target);
+                await SendMessageAsync($"too far {dist}");
+                CharMovement.MoveToAndHit(target);
                 return;
             }
 
-            if ((reqMp > 0) && (reqMp > CurMp))
+            if ((reqMp > 0) && (reqMp > CharStatus.CurrentMp))
             {
-                SendMessage($"no mp {CurMp} {reqMp}");
-                SendActionFailed();
+                await SendMessageAsync($"no mp {CharStatus.CurrentMp} {reqMp}");
+                await SendActionFailedAsync();
                 return;
             }
 
             if (ranged)
             {
-                SendPacket(new SetupGauge(ObjId, SetupGauge.SgColor.Red, (int)timeAtk));
+                await SendPacketAsync(new SetupGauge(ObjectId, SetupGauge.SgColor.Red, (int)timeAtk));
                 //Inventory.destroyItem(SecondaryWeaponSupport, 1, false, true);
             }
 
@@ -1222,15 +1174,15 @@ namespace L2dotNET.model.player
             if (dual)
             {
                 Hit1 = GenHitSimple(true, ss);
-                atk.AddHit(target.ObjId, (int)Hit1.Damage, Hit1.Miss, Hit1.Crit, Hit1.ShieldDef > 0);
+                atk.AddHit(target.ObjectId, (int)Hit1.Damage, Hit1.Miss, Hit1.Crit, Hit1.ShieldDef > 0);
 
                 Hit2 = GenHitSimple(true, ss);
-                atk.AddHit(target.ObjId, (int)Hit2.Damage, Hit2.Miss, Hit2.Crit, Hit2.ShieldDef > 0);
+                atk.AddHit(target.ObjectId, (int)Hit2.Damage, Hit2.Miss, Hit2.Crit, Hit2.ShieldDef > 0);
             }
             else
             {
                 Hit1 = GenHitSimple(false, ss);
-                atk.AddHit(target.ObjId, (int)Hit1.Damage, Hit1.Miss, Hit1.Crit, Hit1.ShieldDef > 0);
+                atk.AddHit(target.ObjectId, (int)Hit1.Damage, Hit1.Miss, Hit1.Crit, Hit1.ShieldDef > 0);
             }
 
             Target = target;
@@ -1238,7 +1190,7 @@ namespace L2dotNET.model.player
             if (AttackToHit == null)
             {
                 AttackToHit = new Timer();
-                AttackToHit.Elapsed += AttackDoHit;
+                AttackToHit.Elapsed += AttackDoHitAsync;
             }
 
             double timeToHit = ranged ? timeAtk * 0.5 : timeAtk * 0.6;
@@ -1266,88 +1218,30 @@ namespace L2dotNET.model.player
             AttackToEnd.Interval = timeAtk;
             AttackToEnd.Enabled = true;
 
-            BroadcastPacket(atk);
-        }
-
-        public override void AttackDoHit(object sender, ElapsedEventArgs e)
-        {
-            if ((Target != null) && !Target.Dead)
-            {
-                if (!Hit1.Miss)
-                {
-                    if (Hit1.Crit)
-                        SendPacket(new SystemMessage(SystemMessage.SystemMessageId.C1LandedACriticalHit).AddPlayerName(Name));
-
-                    SendPacket(new SystemMessage(SystemMessage.SystemMessageId.C1HasGivenC2DamageOfS3).AddPlayerName(Name).AddName(Target).AddNumber(Hit1.Damage));
-                    Target.ReduceHp(this, Hit1.Damage);
-
-                    if (Target is L2Player)
-                        Target.SendPacket(new SystemMessage(SystemMessage.SystemMessageId.C1HasReceivedS3DamageFromC2).AddName(Target).AddName(this).AddNumber(Hit1.Damage));
-                }
-                else
-                {
-                    SendPacket(new SystemMessage(SystemMessage.SystemMessageId.C1AttackWentAstray).AddPlayerName(Name));
-
-                    if (Target is L2Player)
-                    {
-                        Target.SendPacket(new SystemMessage(SystemMessage.SystemMessageId.C1HasEvadedC2Attack).AddName(Target).AddName(this));
-                    }
-                }
-            }
-
-            AttackToHit.Enabled = false;
-        }
-
-        public override void AttackDoHit2Nd(object sender, ElapsedEventArgs e)
-        {
-            if ((Target != null) && !Target.Dead)
-            {
-                if (!Hit2.Miss)
-                {
-                    if (Hit2.Crit)
-                        SendPacket(new SystemMessage(SystemMessage.SystemMessageId.C1LandedACriticalHit).AddName(this));
-
-                    SendPacket(new SystemMessage(SystemMessage.SystemMessageId.C1HasGivenC2DamageOfS3).AddName(this).AddName(Target).AddNumber(Hit2.Damage));
-                    Target.ReduceHp(this, Hit2.Damage);
-
-                    if (Target is L2Player)
-                        Target.SendPacket(new SystemMessage(SystemMessage.SystemMessageId.C1HasReceivedS3DamageFromC2).AddName(Target).AddName(this).AddNumber(Hit2.Damage));
-                }
-                else
-                {
-                    SendPacket(new SystemMessage(SystemMessage.SystemMessageId.C1AttackWentAstray).AddPlayerName(Name));
-
-                    if (Target is L2Player)
-                    {
-                        Target.SendPacket(new SystemMessage(SystemMessage.SystemMessageId.C1HasEvadedC2Attack).AddName(Target).AddName(this));
-                    }
-                }
-            }
-
-            AttackToHitBonus.Enabled = false;
+            BroadcastPacketAsync(atk);*/
         }
 
         public override void AttackDoEnd(object sender, ElapsedEventArgs e)
         {
             AttackToEnd.Enabled = false;
             AttackToEnd.Stop();
-            if(this.Target.Dead)
-            {
-                SendMessage("Target Killed");
-                if(this.Target is L2Npc)
-                {
-                    try
-                    {
-                        L2Npc target = (L2Npc)this.Target;
-                        target.DoDie(this);
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Debug(ex.Message);
-                    }
-                }
+            //if(this.Target.Dead)
+            //{
+            //    SendMessage("Target Killed");
+            //    if(this.Target is L2Npc)
+            //    {
+            //        try
+            //        {
+            //            L2Npc target = (L2Npc)this.Target;
+            //            target.DoDieAsync(this);
+            //        }
+            //        catch (Exception ex)
+            //        {
+            //            Log.Debug(ex.Message);
+            //        }
+            //    }
                 
-            }
+            //}
 
             //L2Item weapon = Inventory.getWeapon();
             //if (weapon != null)
@@ -1359,7 +1253,7 @@ namespace L2dotNET.model.player
             //    {
             //        if (Inventory.getItemCount(sid) < weapon.Template.SoulshotCount)
             //        {
-            //            sendPacket(new SystemMessage(SystemMessage.SystemMessageId.AUTO_USE_CANCELLED_LACK_OF_S1).AddItemName(sid));
+            //            sendPacket(new SystemMessage(SystemMessageId.AUTO_USE_CANCELLED_LACK_OF_S1).AddItemName(sid));
 
             //            lock (autoSoulshots)
             //            {
@@ -1400,20 +1294,12 @@ namespace L2dotNET.model.player
                 return Sex == 0 ? BaseClass.CollisionHeight : BaseClass.CollisionHeightFemale;
             }
         }
-
-        public List<int> AutoSoulshots = new List<int>();
-        public List<int> SetKeyItems;
-        public int SetKeyId;
-
-        public int MountType;
-        public NpcTemplate MountedTemplate;
-        public int TradeState;
-
+     
         public void Mount(NpcTemplate npc)
         {
-            BroadcastPacket(new Ride(this, true, npc.NpcId));
+            BroadcastPacketAsync(new Ride(this, true, npc.NpcId));
             MountedTemplate = npc;
-            BroadcastUserInfo();
+            BroadcastUserInfoAsync();
         }
 
         public void MountPet()
@@ -1423,13 +1309,10 @@ namespace L2dotNET.model.player
 
         public void UnMount()
         {
-            BroadcastPacket(new Ride(this, false));
+            BroadcastPacketAsync(new Ride(this, false));
             MountedTemplate = null;
-            BroadcastUserInfo();
+            BroadcastUserInfoAsync();
         }
-
-        public SortedList<int, int> CurrentTrade;
-        public int Sstt;
 
         public int AddItemToTrade(int objId, int num)
         {
@@ -1448,35 +1331,26 @@ namespace L2dotNET.model.player
 
         public void NotifyDayChange(GameserverPacket pk)
         {
-            SendPacket(pk);
+            SendPacketAsync(pk);
             //if (pk is SunSet) //включаем ночные скилы
             //    AiCharacter.NotifyOnStartNight();
             //else
             //    AiCharacter.NotifyOnStartDay();
         }
 
-        public int VehicleId => Boat?.ObjId ?? 0;
-
         public void Revive(double percent)
         {
-            BroadcastPacket(new Revive(ObjId));
+            BroadcastPacketAsync(new Revive(ObjectId));
             Dead = false;
-            Status.StartHpMpRegeneration();
+            CharStatus.StartHpMpRegeneration();
         }
-
-        private DateTime _pingTimeout;
-        private int _lastPingId;
-        public int Ping = -1;
-        public MultiSellList CustomMultiSellList;
-        public int LastRequestedMultiSellId = -1;
-        public int AttackingId;
 
         public void RequestPing()
         {
-            _lastPingId = new Random().Next();
+            _lastPingId = RandomThreadSafe.Instance.Next();
             NetPing ping = new NetPing(_lastPingId);
             _pingTimeout = DateTime.Now;
-            SendPacket(ping);
+            SendPacketAsync(ping);
         }
 
         public void UpdatePing(int id, int ms, int unk)
@@ -1488,7 +1362,7 @@ namespace L2dotNET.model.player
             }
 
             Ping = ms;
-            SendMessage($"Your connection latency is {ms}");
+            SendMessageAsync($"Your connection latency is {ms}");
         }
 
         public void InstantTeleportWithItem(int x, int y, int z, int id, int cnt)
@@ -1501,27 +1375,27 @@ namespace L2dotNET.model.player
             double expPet = 0.0;
             double expReward = mob.Template.Exp / 1.0;
             int sp = mob.Template.Sp;
-            SendMessage($"debug: expPet {expPet}");
-            SendMessage($"debug: mob.Template {mob.Template.Exp} @");
-            SendMessage($"debug: expReward {expReward}");
-            SendMessage($"debug: sp {sp}");
+            SendMessageAsync($"debug: expPet {expPet}");
+            SendMessageAsync($"debug: mob.Template {mob.Template.Exp} @");
+            SendMessageAsync($"debug: expReward {expReward}");
+            SendMessageAsync($"debug: sp {sp}");
 
             byte oldLvl = Level;
-            Exp += (long)expReward;
-            byte newLvl = Experience.GetLevel(Exp);
+            Experience += (long)expReward;
+            byte newLvl = Player.Experience.GetLevel(Experience);
             bool lvlChanged = oldLvl != newLvl;
 
-            Exp += (long)expReward;
+            Experience += (long)expReward;
             if (lvlChanged)
             {
                 Level = newLvl;
-                BroadcastPacket(new SocialAction(ObjId, 2122));
+                BroadcastPacketAsync(new SocialAction(ObjectId, 2122));
             }
 
             if (!lvlChanged)
-                SendPacket(new UserInfo(this));
+                SendPacketAsync(new UserInfo(this));
             else
-                BroadcastUserInfo();
+                BroadcastUserInfoAsync();
         }
 
         public void BroadcastSkillUse(int skillId)
@@ -1534,25 +1408,11 @@ namespace L2dotNET.model.player
         {
             return null;
         }
-
-        public void UpdateAgathionEnergy(int count)
-        {
-            SendMessage($"@UpdateAgathionEnergy {count}");
-        }
-
         
-        public override void DoDie(L2Character killer)
+        public override async Task DoDieAsync(L2Character killer)
         {
-            base.DoDie(killer);
+            await base.DoDieAsync(killer);
         }
-
-        public bool CharDeleteTimeExpired() => (DeleteTime > 0) && (DeleteTime <= Utilz.CurrentTimeMillis());
-
-        public int RemainingDeleteTime() => AccessLevel > -100 ? (DeleteTime > 0 ? (int)((DeleteTime - Utilz.CurrentTimeMillis()) / 1000) : 0) : -1;
-
-        public void SetCharDeleteTime() => DeleteTime = Utilz.CurrentTimeMillis() + (Config.Config.Instance.GameplayConfig.Server.Client.DeleteCharAfterDays * 86400000L);
-
-        public void SetCharLastAccess() => LastAccess = Utilz.CurrentTimeMillis();
 
         internal void DropItem(int objectId, int count, int x, int y, int z)
         {
@@ -1564,12 +1424,33 @@ namespace L2dotNET.model.player
             return $"{Name} - {base.ToString()}";
         }
 
-        public void SetupKnows()
+        public async Task SetupKnowsAsync()
         {
-            foreach (var obj in L2World.Instance.GetObjects().Where(x=>x.Region == Region))
+            foreach (var obj in L2World.GetObjects().Where(x=>x.Region == Region))
             {
-                obj.BroadcastUserInfoToObject(this);
+                await obj.BroadcastUserInfoToObjectAsync(this);
             }
         }
+        public async Task SetupKnowsAsync(L2WorldRegion region)
+        {
+            var regions = region.GetSurroundingRegions();
+            foreach (var reg in regions)
+            {
+                foreach (var obj in L2World.GetObjects().Where(x => x.Region == reg))
+                {
+                    await obj.BroadcastUserInfoToObjectAsync(this);
+                }
+            }
+        }
+
+        public bool CharDeleteTimeExpired() => DeleteTime.HasValue && DeleteTime.Value < DateTime.UtcNow;
+
+        public int RemainingDeleteTime() => AccessLevel > -100
+            ? (DeleteTime.HasValue ? (int) (DeleteTime.Value - DateTime.UtcNow).TotalSeconds : 0)
+            : -1;
+
+        public void SetCharDeleteTime() => DeleteTime = DateTime.UtcNow.AddDays(_characterService.GetDaysRequiredToDeletePlayer());
+
+        public void SetCharLastAccess() => LastAccess = DateTime.UtcNow;
     }
 }

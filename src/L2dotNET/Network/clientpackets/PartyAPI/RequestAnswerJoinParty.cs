@@ -1,4 +1,7 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Network.clientpackets.PartyAPI
@@ -8,44 +11,47 @@ namespace L2dotNET.Network.clientpackets.PartyAPI
         private readonly GameClient _client;
         private readonly int _response;
 
-        public RequestAnswerJoinParty(Packet packet, GameClient client)
+        public RequestAnswerJoinParty(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _response = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-            player.PartyState = 0;
-
-            if (player.Requester == null)
+            await Task.Run(() =>
             {
-                player.SendActionFailed();
-                return;
-            }
+                L2Player player = _client.CurrentPlayer;
+                player.PartyState = 0;
 
-            if (player.Requester.IsInOlympiad)
-            {
-                player.Requester.SendSystemMessage(SystemMessage.SystemMessageId.UserCurrentlyParticipatingInOlympiadCannotSendPartyAndFriendInvitations);
-                return;
-            }
-
-            player.Requester.SendPacket(new JoinParty(_response));
-
-            switch (_response)
-            {
-                case -1:
+                if (player.Requester == null)
                 {
-                    SystemMessage sm = new SystemMessage(SystemMessage.SystemMessageId.C1IsSetToRefusePartyRequests);
-                    sm.AddPlayerName(player.Name);
-                    player.Requester.SendPacket(sm);
+                    player.SendActionFailedAsync();
+                    return;
                 }
-                    break;
-                case 1:
-                    AcceptPartyInvite(player.Requester, player);
-                    break;
-            }
+
+                if (player.Requester.IsInOlympiad)
+                {
+                    player.Requester.SendSystemMessage(SystemMessageId.UserCurrentlyParticipatingInOlympiadCannotSendPartyAndFriendInvitations);
+                    return;
+                }
+
+                player.Requester.SendPacketAsync(new JoinParty(_response));
+
+                switch (_response)
+                {
+                    case -1:
+                    {
+                        SystemMessage sm = new SystemMessage(SystemMessageId.C1IsSetToRefusePartyRequests);
+                        sm.AddPlayerName(player.Name);
+                        player.Requester.SendPacketAsync(sm);
+                    }
+                        break;
+                    case 1:
+                        AcceptPartyInvite(player.Requester, player);
+                        break;
+                }
+            });
         }
 
         private void AcceptPartyInvite(L2Player leader, L2Player player)
@@ -55,7 +61,7 @@ namespace L2dotNET.Network.clientpackets.PartyAPI
 
             if (leader.Party.Members.Count == 9)
             {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.CannotEnterDuePartyHavingExceedLimit);
+                player.SendSystemMessage(SystemMessageId.CannotEnterDuePartyHavingExceedLimit);
                 return;
             }
 

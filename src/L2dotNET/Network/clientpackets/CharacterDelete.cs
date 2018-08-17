@@ -1,85 +1,81 @@
-﻿using System.Linq;
-using log4net;
-using L2dotNET.model.player;
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 using L2dotNET.Services.Contracts;
-using Ninject;
+using L2dotNET.Utility;
+using Microsoft.Extensions.DependencyInjection;
+using NLog;
 
 namespace L2dotNET.Network.clientpackets
 {
     class CharacterDelete : PacketBase
     {
-        [Inject]
-        public IPlayerService PlayerService => GameServer.Kernel.Get<IPlayerService>();
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        private static readonly ILog Log = LogManager.GetLogger(typeof(CharacterDelete));
-
+        private readonly ICharacterService _characterService;
+        private readonly ICrudService<CharacterContract> _characterCrudService;
         private readonly GameClient _client;
         private readonly int _charSlot;
 
-        public CharacterDelete(Packet packet, GameClient client)
+        public CharacterDelete(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
+            _characterService = serviceProvider.GetService<ICharacterService>();
+            _characterCrudService = serviceProvider.GetService<ICrudService<CharacterContract>>();
             _charSlot = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            //if (!FloodProtectors.performAction(getClient(), Action.CHARACTER_SELECT))
-            //{
-            //  _client.SendPacket(new CharDeleteFail(CharDeleteFail.CharDeleteFailReason.DeletionFailed));
-            //	return;
-            //}
-
             ValidateAndDelete();
 
-            _client.SendPacket(new CharacterSelectionInfo(_client.AccountName, _client.AccountChars, _client.SessionKey.PlayOkId1));
+            _client.SendPacketAsync(new CharList(_client, _client.SessionKey.PlayOkId1));
+
         }
 
         private void ValidateAndDelete()
         {
-            L2Player player = _client.AccountChars.FirstOrDefault(filter => filter.CharSlot == _charSlot);
+            L2Player player = _client.AccountCharacters.FirstOrDefault(filter => filter.CharacterSlot == _charSlot);
 
             if (player == null)
             {
                 Log.Warn($"{_client.Address} tried to delete Character in slot {_charSlot} but no characters exits at that slot.");
-                _client.SendPacket(new CharDeleteFail(CharDeleteFail.CharDeleteFailReason.DeletionFailed));
+                _client.SendPacketAsync(new CharDeleteFail(CharDeleteFail.CharDeleteFailReason.DeletionFailed));
                 return;
             }
 
-            //if ((player.ClanId != 0) && (player.Clan != null))
-            //{
-            //    if (player.Clan.LeaderId == player.ObjId)
-            //    {
-            //        _client.SendPacket(new CharDeleteFail(CharDeleteFail.CharDeleteFailReason.ClanLeadersMayNotBeDeleted));
-            //        return;
-            //    }
-
-            //    _client.SendPacket(new CharDeleteFail(CharDeleteFail.CharDeleteFailReason.YouMayNotDeleteClanMember));
-            //    return;
-            //}
-
-            if (Config.Config.Instance.GameplayConfig.Server.Client.DeleteCharAfterDays == 0)
+            // TODO: rework that when clan system would be done
+            /*if ((player.ClanId != 0) && (player.Clan != null))
             {
-                if (!PlayerService.DeleteCharByObjId(player.ObjId))
+                if (player.Clan.LeaderId == player.ObjId)
                 {
-                    _client.SendPacket(new CharDeleteFail(CharDeleteFail.CharDeleteFailReason.DeletionFailed));
+                    _client.SendPacket(new CharDeleteFail(CharDeleteFail.CharDeleteFailReason.ClanLeadersMayNotBeDeleted));
+                    return;
+                }
+                _client.SendPacket(new CharDeleteFail(CharDeleteFail.CharDeleteFailReason.YouMayNotDeleteClanMember));
+                return;
+            }*/
+
+            if (_characterService.GetDaysRequiredToDeletePlayer() == 0)
+            {
+                if (!_characterService.DeleteCharById(player.ObjectId))
+                {
+                    _client.SendPacketAsync(new CharDeleteFail(CharDeleteFail.CharDeleteFailReason.DeletionFailed));
                     return;
                 }
 
-                _client.RemoveAccountCharAndResetSlotIndex(_charSlot);
+                _client.DeleteCharacter(_charSlot);
             }
             else
             {
                 player.SetCharDeleteTime();
-                if (!PlayerService.MarkToDeleteChar(player.ObjId, player.DeleteTime))
-                {
-                    _client.SendPacket(new CharDeleteFail(CharDeleteFail.CharDeleteFailReason.DeletionFailed));
-                    return;
-                }
+                _characterCrudService.Update(player.ToContract());
             }
 
-            _client.SendPacket(new CharDeleteOk());
+            _client.SendPacketAsync(new CharDeleteOk());
         }
     }
 }

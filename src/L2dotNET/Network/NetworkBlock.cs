@@ -2,16 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using log4net;
-using L2dotNET.DataContracts;
-using L2dotNET.Models;
 using L2dotNET.Utility;
+using NLog;
 
 namespace L2dotNET.Network
 {
-    class NetworkBlock
+    public class NetworkBlock
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(NetworkBlock));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         private static volatile NetworkBlock _instance;
         private static readonly object SyncRoot = new object();
 
@@ -71,7 +69,7 @@ namespace L2dotNET.Network
                 }
             }
 
-            Log.Info($"NetworkBlock: {Blocks.Count} blocks.");
+            Log.Info($"{Blocks.Count} blocks.");
         }
 
         public bool Allowed(string ip)

@@ -1,6 +1,9 @@
-﻿using L2dotNET.managers;
-using L2dotNET.model.items;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Managers;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Network.clientpackets.ItemEnchantAPI
@@ -10,34 +13,37 @@ namespace L2dotNET.Network.clientpackets.ItemEnchantAPI
         private readonly GameClient _client;
         private readonly int _aSTargetId;
 
-        public RequestExTryToPutEnchantTargetItem(Packet packet, GameClient client)
+        public RequestExTryToPutEnchantTargetItem(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             packet.MoveOffset(2);
             _client = client;
             _aSTargetId = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            if (player.EnchantState != ItemEnchantManager.StatePutItem)
+            await Task.Run(() =>
             {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.InappropriateEnchantCondition);
-                player.SendActionFailed();
-                return;
-            }
+                L2Player player = _client.CurrentPlayer;
 
-            L2Item item = player.GetItemByObjId(_aSTargetId);
+                if (player.EnchantState != ItemEnchantManager.StatePutItem)
+                {
+                    player.SendSystemMessage(SystemMessageId.InappropriateEnchantCondition);
+                    player.SendActionFailedAsync();
+                    return;
+                }
 
-            if (item == null)
-            {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.InappropriateEnchantCondition);
-                player.SendActionFailed();
-                return;
-            }
+                L2Item item = player.GetItemByObjId(_aSTargetId);
 
-            ItemEnchantManager.GetInstance().TryPutItem(player, item);
+                if (item == null)
+                {
+                    player.SendSystemMessage(SystemMessageId.InappropriateEnchantCondition);
+                    player.SendActionFailedAsync();
+                    return;
+                }
+
+                ItemEnchantManager.GetInstance().TryPutItem(player, item);
+            });
         }
     }
 }

@@ -1,16 +1,15 @@
-﻿using L2dotNET.model.items;
-using L2dotNET.world;
+﻿using L2dotNET.DataContracts;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Services.Contracts;
+using L2dotNET.Tables;
 
-namespace L2dotNET.model.inventory
+namespace L2dotNET.Models.Inventory
 {
     public class PetInventory : Inventory
     {
-        public PetInventory(L2Character owner) : base(owner)
+        public PetInventory(L2Character owner)
+            : base(owner)
         {
-            Owner = owner;
         }
-
-        protected override L2Character Owner { get; set; }
-        protected override L2Item.ItemLocation BaseLocation { get; }
     }
 }

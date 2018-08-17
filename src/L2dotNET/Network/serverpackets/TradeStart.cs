@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
-using L2dotNET.model.items;
-using L2dotNET.model.player;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -13,7 +13,7 @@ namespace L2dotNET.Network.serverpackets
         public TradeStart(L2Player player)
         {
             _player = player;
-            _partnerId = player.Requester.ObjId;
+            _partnerId = player.Requester.ObjectId;
             //foreach (L2Item item in player.getAllNonQuestItems().Where(item => (item.Template.is_trade != 0) && (item.AugmentationID <= 0) && (item._isEquipped != 1) && (item.Template.Type != ItemTemplate.L2ItemType.asset)))
             //    trade.Add(item);
         }
@@ -27,14 +27,14 @@ namespace L2dotNET.Network.serverpackets
             foreach (L2Item item in _trade)
             {
                 WriteShort(item.Template.Type1);
-                WriteInt(item.ObjId);
+                WriteInt(item.ObjectId);
                 WriteInt(item.Template.ItemId);
                 WriteInt(item.Count);
 
                 WriteShort(item.Template.Type2);
                 WriteShort(item.CustomType1);
 
-                WriteInt(item.Template.BodyPart);
+                WriteInt((int) item.Template.BodyPart);
                 WriteShort(item.Enchant);
                 WriteShort(item.CustomType2);
 

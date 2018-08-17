@@ -1,41 +1,32 @@
 ﻿using System;
-using log4net;
-using L2dotNET.Services.Contracts;
-using Ninject;
+using System.Threading.Tasks;
+using NLog;
 
 namespace L2dotNET
 {
-    public class PreReqValidation
+    public class PreReqValidation : IInitialisable
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(PreReqValidation));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        [Inject]
-        public ICheckService CheckService => GameServer.Kernel.Get<ICheckService>();
+        public bool Initialised { get; private set; }
 
-        private static volatile PreReqValidation _instance;
-        private static readonly object SyncRoot = new object();
-
-        public static PreReqValidation Instance
+        public PreReqValidation()
         {
-            get
-            {
-                if (_instance != null)
-                    return _instance;
-
-                lock (SyncRoot)
-                {
-                    if (_instance == null)
-                        _instance = new PreReqValidation();
-                }
-
-                return _instance;
-            }
         }
 
-        public void Initialize()
+        public async Task Initialise()
         {
-            if (CheckService.PreCheckRepository())
+            if (Initialised)
+            {
                 return;
+            }
+
+            //TODO: Add Check service
+            if (true)
+            {
+                Initialised = true;
+                return;
+            }
 
             Log.Warn("Some checks have failed. Please correct the errors and try again.");
             Log.Info("Press ENTER to exit...");

@@ -1,21 +1,13 @@
 ﻿using System;
 using System.Linq;
 using System.Text.RegularExpressions;
-using log4net;
+using NLog;
 
 namespace L2dotNET.Utility
 {
     public static class StringHelper
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(StringHelper));
-
-        // used to convert string to C# enum naming (i_p_attack -> IPAttack, can_summon_cubic -> CanSummonCubic and etc)
-        public static string ToTitleCase(this string str, char delimeter)
-        {
-            if (str == null) return null;
-
-            return string.Join(string.Empty, str.Split(delimeter).Select(item => item.First().ToString().ToUpper() + item.Substring(1)).ToArray());
-        }
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         /// <summary>Verify if the given name matches with the regular expression pattern.</summary>
         /// <param name="name">The name to search for a match.</param>
@@ -40,7 +32,7 @@ namespace L2dotNET.Utility
         /// <returns>true if the regular expression finds a match; otherwise, false.</returns>
         public static bool IsValidPlayerName(string name)
         {
-            return IsValidName(name, Config.Config.Instance.GameplayConfig.OtherConfig.RegexNamePattern);
+            return IsValidName(name, "^[A-Za-z0-9]{1,16}$");
         }
     }
 }

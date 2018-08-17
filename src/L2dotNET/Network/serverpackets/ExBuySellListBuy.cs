@@ -1,5 +1,4 @@
-﻿using L2dotNET.model.player;
-using L2dotNET.tables;
+﻿using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.serverpackets
 {

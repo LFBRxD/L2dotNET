@@ -1,8 +1,8 @@
-﻿using L2dotNET.model.player;
+﻿using L2dotNET.Models.Player;
 
 namespace L2dotNET.Handlers
 {
-    public interface IAdminCommandHandler
+    public interface IAdminCommandHandler : IInitialisable
     {
         void Request(L2Player admin, string alias);
 

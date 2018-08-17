@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using L2dotNET.model.player;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 using L2dotNET.Utility;
 
 namespace L2dotNET.Network.serverpackets
@@ -25,30 +26,30 @@ namespace L2dotNET.Network.serverpackets
             _arg = arg;
         }
 
-        public static void SeparateAndSend(string html, L2Player player)
+        public static async Task SeparateAndSendAsync(string html, L2Player player)
         {
             if (html.Length < BbsMax)
             {
-                player.SendPacket(new ShowBoard(html, "101"));
-                player.SendPacket(new ShowBoard(null, "102"));
-                player.SendPacket(new ShowBoard(null, "103"));
+                await player.SendPacketAsync(new ShowBoard(html, "101"));
+                await player.SendPacketAsync(new ShowBoard(null, "102"));
+                await player.SendPacketAsync(new ShowBoard(null, "103"));
             }
             else
             {
                 if (html.Length < (BbsMax * 2))
                 {
-                    player.SendPacket(new ShowBoard(html.Remove(BbsMax), "101"));
-                    player.SendPacket(new ShowBoard(html.Substring(BbsMax), "102"));
-                    player.SendPacket(new ShowBoard(null, "103"));
+                    await player.SendPacketAsync(new ShowBoard(html.Remove(BbsMax), "101"));
+                    await player.SendPacketAsync(new ShowBoard(html.Substring(BbsMax), "102"));
+                    await player.SendPacketAsync(new ShowBoard(null, "103"));
                 }
                 else
                 {
                     if (html.Length >= (BbsMax * 3))
                         return;
 
-                    player.SendPacket(new ShowBoard(html.Remove(BbsMax), "101"));
-                    player.SendPacket(new ShowBoard(html.Substring(BbsMax).Remove(BbsMax), "102"));
-                    player.SendPacket(new ShowBoard(html.Substring(BbsMax * 2), "103"));
+                    await player.SendPacketAsync(new ShowBoard(html.Remove(BbsMax), "101"));
+                    await player.SendPacketAsync(new ShowBoard(html.Substring(BbsMax).Remove(BbsMax), "102"));
+                    await player.SendPacketAsync(new ShowBoard(html.Substring(BbsMax * 2), "103"));
                 }
             }
         }

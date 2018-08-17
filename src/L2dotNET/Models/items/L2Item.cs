@@ -1,24 +1,20 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using L2dotNET.DataContracts;
-using L2dotNET.model.inventory;
-using L2dotNET.model.player;
-using L2dotNET.Models;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 using L2dotNET.Services.Contracts;
-using L2dotNET.tables;
-using L2dotNET.tools;
-using L2dotNET.world;
-using Ninject;
+using L2dotNET.Tables;
+using L2dotNET.Tools;
+using L2dotNET.World;
+using static L2dotNET.Models.Inventory.Inventory;
 
-namespace L2dotNET.model.items
+namespace L2dotNET.Models.Items
 {
     public class L2Item : L2Object
     {
-        [Inject]
-        public IItemService ItemService => GameServer.Kernel.Get<IItemService>();
-
         public ItemTemplate Template;
         public int Count;
         public short IsEquipped { get; set; }
@@ -42,10 +38,13 @@ namespace L2dotNET.model.items
 
         public bool Blocked = false;
         public bool TempBlock = false;
-
-        public L2Item(ItemTemplate template , int objectId) : base(objectId)
+        private readonly ICrudService<ItemContract> _itemCrudService;
+        private readonly IdFactory _idFactory;
+        public L2Item(ICrudService<ItemContract> itemCrudService, IdFactory idFactory, ItemTemplate template , int objectId) : base(objectId)
         {
-            ObjId = objectId != 0 ? objectId : IdFactory.Instance.NextId();
+            _itemCrudService = itemCrudService;
+            _idFactory = idFactory;
+            ObjectId = objectId != 0 ? objectId : _idFactory.NextId();
             Template = template;
             Count = 1;
             Location = ItemLocation.Void;
@@ -53,9 +52,8 @@ namespace L2dotNET.model.items
 
         public void GenId()
         {
-            ObjId = IdFactory.Instance.NextId();
+            ObjectId = _idFactory.NextId();
         }
-
 
         public void ChangeCount(int count, L2Player creator)
         {
@@ -71,21 +69,6 @@ namespace L2dotNET.model.items
                 Count = 0;
         }
 
-        /** Enumeration of locations for item */
-
-        public enum ItemLocation
-        {
-            Void,
-            Inventory,
-            Paperdoll,
-            Warehouse,
-            Clanwh,
-            Pet,
-            PetEquip,
-            Lease,
-            Freight
-        }
-
         public void Unequip(L2Player owner)
         {
             PaperdollSlot = -1;
@@ -98,8 +81,8 @@ namespace L2dotNET.model.items
         public void Equip(L2Player owner)
         {
             Location = ItemLocation.Paperdoll;
-            SlotLocation = Inventory.GetPaperdollIndex(Template.BodyPart);
-            PaperdollSlot = Inventory.GetPaperdollIndex(Template.BodyPart);
+            SlotLocation = GetPaperdollIndex((int) Template.BodyPart);
+            PaperdollSlot = GetPaperdollIndex((int) Template.BodyPart);
             IsEquipped = 1;
         }
 
@@ -116,13 +99,13 @@ namespace L2dotNET.model.items
             Z = z;
             DropItem pk = new DropItem(this);
             if (dropper != null)
-                Dropper = dropper.ObjId;
+                Dropper = dropper.ObjectId;
 
             Location = ItemLocation.Void;
 
             killer?.AddKnownObject(this, pk, true);
 
-            L2World.Instance.AddObject(this);
+            L2World.AddObject(this);
         }
 
         public void DropMe(int x, int y, int z)
@@ -130,29 +113,29 @@ namespace L2dotNET.model.items
             DropMe(x, y, z, null, null, 0);
         }
 
-        public override void OnAction(L2Player player)
+        public override async Task OnActionAsync(L2Player player)
         {
             double dis = Calcs.CalculateDistance(this, player, true);
-            player.SendMessage($"{AsString()} dis {(int)dis}");
+            await player.SendMessageAsync($"{AsString()} dis {(int)dis}");
             if (dis < 80)
             {
                 foreach (L2Player o in KnownObjects.Values.OfType<L2Player>())
                 {
-                    o.SendPacket(new GetItem(player.ObjId, ObjId, X, Y, Z));
-                    o.SendPacket(new DeleteObject(ObjId));
+                    await o.SendPacketAsync(new GetItem(player.ObjectId, ObjectId, X, Y, Z));
+                    await o.SendPacketAsync(new DeleteObject(ObjectId));
                 }
 
                 player.OnPickUp(this);
 
-                L2World.Instance.RemoveObject(this);
+                L2World.RemoveObject(this);
             }
             else
-                player.TryMoveTo(X, Y, Z);
+                await player.CharMovement.MoveTo(X, Y, Z);
         }
 
-        public override void OnForcedAttack(L2Player player)
+        public override async Task OnForcedAttackAsync(L2Player player)
         {
-            player.SendActionFailed();
+            await player.SendActionFailedAsync();
         }
 
         public void UpdateDatabase()
@@ -178,60 +161,37 @@ namespace L2dotNET.model.items
         {
             ItemContract contract = MapItemModel();
 
-            ItemService.UpdateItem(contract);
+            _itemCrudService.Update(contract);
         }
 
         private void InsertInDb()
         {
             Location = ItemLocation.Inventory;
             ItemContract contract = MapItemModel();
-            ExistsInDb = contract.ExistsInDb = true;
 
-            ItemService.InsertNewItem(contract);
-        }
-
-        public static List<L2Item> RestoreFromDb(List<ItemContract> models)
-        {
-            return models.Select(MapModelToItem).ToList();
+            _itemCrudService.Add(contract);
         }
 
         private ItemContract MapItemModel()
         {
             ItemContract contract = new ItemContract
             {
-                ObjectId = ObjId,
+                ObjectId = ObjectId,
                 ItemId = Template.ItemId,
                 Count = Count,
                 CustomType1 = CustomType1,
                 CustomType2 = CustomType2,
                 Enchant = Enchant,
                 LocationData = SlotLocation,
-                Location = Enum.GetName(typeof(ItemLocation), Location),
-                OwnerId = OwnerId,
+                Location = Location,
+                CharacterId = OwnerId,
                 ManaLeft = 0,
                 Time = 0,
                 TimeOfUse = null
             };
             return contract;
         }
-
-        private static L2Item MapModelToItem(ItemContract contract)
-        {
-            L2Item item = new L2Item(ItemTable.Instance.GetItem(contract.ItemId), IdFactory.Instance.NextId())
-            {
-                ObjId = contract.ObjectId,
-                Count = contract.Count,
-                CustomType1 = contract.CustomType1,
-                CustomType2 = contract.CustomType2,
-                Enchant = contract.Enchant,
-                SlotLocation = contract.LocationData,
-                OwnerId = contract.OwnerId,
-                ExistsInDb = contract.ExistsInDb
-            };
-
-            return item;
-        }
-
+        
         private bool _lifeTimeEndEnabled;
         private DateTime _lifeTimeEndTime;
         public int CustomType1;
@@ -289,17 +249,17 @@ namespace L2dotNET.model.items
 
         public override string AsString()
         {
-            return $"L2Item:{Template.ItemId}; count {Count}; enchant {Enchant}; id {ObjId}";
+            return $"L2Item:{Template.ItemId}; count {Count}; enchant {Enchant}; id {ObjectId}";
         }
 
         public bool NotForTrade()
         {
-            return !Template.Tradable || (AugmentationId > 0) || (IsEquipped == 1);
+            return !Template.Tradeable || (AugmentationId > 0) || (IsEquipped == 1);
         }
 
         public bool NotForSale()
         {
-            return !Template.Tradable || (IsEquipped == 1);
+            return !Template.Tradeable || (IsEquipped == 1);
         }
     }
 }

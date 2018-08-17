@@ -1,27 +1,31 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace L2dotNET.Network.clientpackets.PartyAPI
 {
-    class RequestWithDrawalParty : PacketBase
+    class RequestWithdrawalParty : PacketBase
     {
         private readonly GameClient _client;
 
-        public RequestWithDrawalParty(Packet packet, GameClient client)
+        public RequestWithdrawalParty(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            if (player.Party == null)
+            await Task.Run(() =>
             {
-                player.SendActionFailed();
-                return;
-            }
+                var player = _client.CurrentPlayer;
 
-            player.Party.Leave(player);
+                if (player.Party == null)
+                {
+                    player.SendActionFailedAsync();
+                    return;
+                }
+
+                player.Party.Leave(player);
+            });
         }
     }
 }

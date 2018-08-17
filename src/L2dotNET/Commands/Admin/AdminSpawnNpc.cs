@@ -1,40 +1,52 @@
 ﻿using System;
+using System.Threading.Tasks;
 using L2dotNET.Attributes;
-using L2dotNET.model.npcs;
-using L2dotNET.model.player;
-using L2dotNET.tables;
-using L2dotNET.templates;
+using L2dotNET.Models.Npcs;
+using L2dotNET.Models.Player;
+using L2dotNET.Tables;
+using L2dotNET.Templates;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace L2dotNET.Commands.Admin
 {
     [Command(CommandName = "spawn")]
     class AdminSpawnNpc : AAdminCommand
     {
-        protected internal override void Use(L2Player admin, string alias)
+        private readonly IdFactory _idFactory;
+        private readonly SpawnTable _spawnTable;
+        public AdminSpawnNpc(IServiceProvider serviceProvider) : base(serviceProvider)
         {
-            var processedVar = alias.Replace("spawn",string.Empty).Trim();
-            NpcTemplate npcTemp = null;
+            _idFactory = serviceProvider.GetService<IdFactory>();
+            _spawnTable = serviceProvider.GetService<SpawnTable>();
+        }
 
-            int potentialInt;
-            if (int.TryParse(processedVar, out potentialInt))
-            {
-                npcTemp = NpcTable.Instance.GetTemplate(potentialInt);
-            }
-            else
-            {
-                npcTemp = NpcTable.Instance.GetTemplateByName(processedVar);
 
-            }
-            if (npcTemp == null)
+        protected internal override async Task UseAsync(L2Player admin, string alias)
+        {
+            await Task.Run(() =>
             {
-                throw new NullReferenceException($"npcTemp is null for {processedVar}");
-            }
+                var processedVar = alias.Replace("spawn",string.Empty).Trim();
+                NpcTemplate npcTemp = null;
 
-            L2Spawn spawn = new L2Spawn(npcTemp);
-            spawn.Location = new SpawnLocation(admin.X,admin.Y,admin.Z,admin.Heading);
-            spawn.Spawn();
-            //L2Spawn spawn = new L2Spawn(18342, 50000, new []{"","",""});
-            //NpcTable.Instance.SpawnNpc(Convert.ToInt32(alias.Split(' ')[1]), admin.X, admin.Y, admin.Z, admin.Heading);
+                int potentialInt;
+                if (int.TryParse(processedVar, out potentialInt))
+                {
+                    npcTemp = NpcTable.GetTemplate(potentialInt);
+                }
+                else
+                {
+                    npcTemp = NpcTable.GetTemplateByName(processedVar);
+
+                }
+                if (npcTemp == null)
+                {
+                    throw new NullReferenceException($"npcTemp is null for {processedVar}");
+                }
+
+                L2Spawn spawn = new L2Spawn(npcTemp, _idFactory, _spawnTable);
+                spawn.Location = new SpawnLocation(admin.X,admin.Y,admin.Z,admin.Heading, 0);
+                spawn.Spawn();
+            });
         }
     }
 }

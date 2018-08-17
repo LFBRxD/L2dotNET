@@ -1,4 +1,7 @@
-﻿using L2dotNET.managers.bbs;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Managers.bbs;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -6,16 +9,21 @@ namespace L2dotNET.Network.clientpackets
     {
         private readonly GameClient _client;
         private readonly int _type;
+        private readonly BbsManager _bbsManager;
 
-        public RequestShowBoard(Packet packet, GameClient client)
+        public RequestShowBoard(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _type = packet.ReadInt();
+            _bbsManager = serviceProvider.GetService<BbsManager>();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            BbsManager.Instance.RequestShow(_client.CurrentPlayer, _type);
+            await Task.Run(() =>
+            {
+                _bbsManager.RequestShow(_client.CurrentPlayer, _type);
+            });
         }
     }
 }

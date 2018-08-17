@@ -1,72 +1,78 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
-using log4net;
+using System.Threading.Tasks;
 using L2dotNET.Controllers;
-using L2dotNET.Enums;
 using L2dotNET.Handlers;
-using L2dotNET.managers;
-using L2dotNET.model.items;
+using L2dotNET.Logging.Abstraction;
+using L2dotNET.Managers;
+using L2dotNET.Models.Items;
 using L2dotNET.Network;
 using L2dotNET.Network.loginauth;
-using L2dotNET.tables;
-using L2dotNET.tables.multisell;
+using L2dotNET.Tables;
 using L2dotNET.Utility;
-using L2dotNET.world;
-using Ninject;
+using L2dotNET.World;
+using Microsoft.Extensions.DependencyInjection;
+using NLog;
 
 namespace L2dotNET
 {
     public class GameServer
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(GameServer));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private TcpListener _listener;
 
-        public static IKernel Kernel { get; set; }
+        public static IServiceProvider ServiceProvider { get; private set; }
 
-        public void Start()
+        public GameServer(IServiceProvider serviceProvider)
         {
-            Config.Config.Instance.Initialize();
+            ServiceProvider = serviceProvider;
+        }
 
-            PreReqValidation.Instance.Initialize();
+        public async void Start()
+        {
+            Config.Config config = ServiceProvider.GetService<Config.Config>();
+            await config.Initialise();
 
-            CharTemplateTable.Instance.Initialize();
+            await ServiceProvider.GetService<PreReqValidation>().Initialise();
 
+            CharTemplateTable.Initialize();
+
+            // TODO: refactor NetworkBlock
             NetworkBlock.Instance.Initialize();
-            GameTime.Instance.Initialize();
+            GameTime.Initialize();
 
-            IdFactory.Instance.Initialize();
+            await ServiceProvider.GetService<IdFactory>().Initialise();
 
-            L2World.Instance.Initialize();
+            L2World.Initialize();
 
-            MapRegionTable.Instance.Initialize();
-            ZoneTable.Instance.Initialize();
+            MapRegionTable.Initialize();
+            ZoneTable.Initialize();
 
-            ItemTable.Instance.Initialize();
-            ItemHandler.Instance.Initialize();
+            await ServiceProvider.GetService<ItemTable>().Initialise();
+            ItemHandler.Initialize();
 
-            NpcTable.Instance.Initialize();
-            MultiSell.Instance.Initialize();
-            Capsule.Instance.Initialize();
-            RecipeTable.Instance.Initialize();
+            NpcTable.Initialize();
+            Capsule.Initialize();
             
             BlowFishKeygen.GenerateKeys();
 
-            AdminCommandHandler.Instance.Initialize();
+            await ServiceProvider.GetService<IAdminCommandHandler>().Initialise();
 
-            AnnouncementManager.Instance.Initialize();
+            await ServiceProvider.GetService<AnnouncementManager>().Initialise();
 
-            StaticObjTable.Instance.Initialize();
-            SpawnTable.Instance.Initialize();
+            StaticObjTable.Initialize();
+            await ServiceProvider.GetService<SpawnTable>().Initialise();
 
-            HtmCache.Instance.Initialize();
+            await ServiceProvider.GetService<HtmCache>().Initialise();
 
-            // PluginManager.Instance.Initialize(this);
+            // TODO: review plugin system
+            //PluginManager.Instance.Initialize(this);
 
-            AuthThread.Instance.Initialize();
+            ServiceProvider.GetService<AuthThread>().Initialise();
 
-            _listener = new TcpListener(IPAddress.Any, Config.Config.Instance.ServerConfig.Port);
+            _listener = new TcpListener(IPAddress.Any, config.ServerConfig.Port);
 
             try
             {
@@ -74,37 +80,30 @@ namespace L2dotNET
             }
             catch (SocketException ex)
             {
-                Log.Error($"Socket Error: '{ex.SocketErrorCode}'. Message: '{ex.Message}' (Error Code: '{ex.NativeErrorCode}')");
-                Log.Info("Press ENTER to exit...");
-                Console.Read();
-                Environment.Exit(0);
+                Log.Halt($"Socket Error: '{ex.SocketErrorCode}'. Message: '{ex.Message}' (Error Code: '{ex.NativeErrorCode}')");
             }
 
-            Log.Info($"Listening Gameservers on port {Config.Config.Instance.ServerConfig.Port}");
+            Log.Info($"Listening Gameservers on port {config.ServerConfig.Port}");
 
-            WaitForClients();
+            Task.Factory.StartNew(WaitForClients);
         }
 
-        private void WaitForClients()
+        private async void WaitForClients()
         {
-            _listener.BeginAcceptTcpClient(OnClientConnected, null);
+            while (true)
+            {
+                TcpClient client = await _listener.AcceptTcpClientAsync();
+#pragma warning disable 4014
+                Task.Factory.StartNew(() => AcceptClient(client));
+#pragma warning restore 4014
+            }
         }
 
-        private void OnClientConnected(IAsyncResult asyncResult)
-        {
-            TcpClient clientSocket = _listener.EndAcceptTcpClient(asyncResult);
-
-            Log.Info($"Received connection request from: {clientSocket.Client.RemoteEndPoint}");
-
-            AcceptClient(clientSocket);
-
-            WaitForClients();
-        }
-
-        /// <summary>Handle Client Request</summary>
         private void AcceptClient(TcpClient clientSocket)
         {
-            ClientManager.Instance.AddClient(clientSocket);
+            Log.Debug($"Received connection request from: {clientSocket.Client.RemoteEndPoint}");
+
+            ServiceProvider.GetService<ClientManager>().AddClient(clientSocket);
         }
     }
 }

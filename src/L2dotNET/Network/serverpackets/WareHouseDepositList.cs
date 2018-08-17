@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
-using L2dotNET.model.items;
-using L2dotNET.model.player;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -31,20 +31,20 @@ namespace L2dotNET.Network.serverpackets
             foreach (L2Item item in _items)
             {
                 WriteShort(item.Template.Type1);
-                WriteInt(item.ObjId);
+                WriteInt(item.ObjectId);
                 WriteInt(item.Template.ItemId);
                 WriteInt(item.Count);
                 WriteShort(item.Template.Type2);
                 WriteShort(0); //custom type 1
-                WriteInt(item.Template.BodyPart);
+                WriteInt((int) item.Template.BodyPart);
                 WriteShort(item.Enchant);
                 WriteShort(0); //custom type 2
                 WriteShort(0);
                 //writeD(item.AugmentationID);
-                WriteInt(item.ObjId);
-                WriteLong(0x00);
-                _items.Clear();
+                WriteInt(item.ObjectId);
+                WriteLong(0x00);                
             }
+            _items.Clear();
         }
     }
 }

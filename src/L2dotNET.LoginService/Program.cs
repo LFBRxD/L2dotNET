@@ -1,28 +1,72 @@
 ﻿using System;
+using System.CodeDom;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
 using System.Threading;
-using log4net;
-using Ninject;
+using System.Threading.Tasks;
+using L2dotNET.Logging.Abstraction;
+using L2dotNET.LoginService.GSCommunication;
+using L2dotNET.LoginService.Network;
+using L2dotNET.Network;
+using L2dotNET.Network.loginauth;
+using L2dotNET.Repositories;
+using L2dotNET.Services;
+using Microsoft.Extensions.DependencyInjection;
+using NLog;
 
 namespace L2dotNET.LoginService
 {
     class Program
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(Program));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private static void Main()
         {
+            ClassLoggerConfigurator.ConfigureClassLogger($"{Assembly.GetExecutingAssembly().Location}.log");
+
+            TaskScheduler.UnobservedTaskException += (sender, e) =>
+                {
+                    Log.ErrorTrace(e.Exception, "UnobservedTaskException");
+                };
+
             Log.Info("Starting LoginService...");
-            SetConsoleConfigurations();
+
+            SetConsoleConfiguration();
             SetNumberDecimalSeparator();
-            LoginServer.Kernel = new StandardKernel(new DepInjectionModule());
-            LoginServer server = LoginServer.Kernel.Get<LoginServer>();
-            server.Start();
+
+            ServiceCollection serviceCollection = new ServiceCollection();
+            ConfigureServices(serviceCollection);
+
+            IServiceProvider serviceProvider = serviceCollection.BuildServiceProvider();
+
+            serviceProvider.GetService<LoginServer>().Start();
+
             Process.GetCurrentProcess().WaitForExit();
         }
 
-        private static void SetConsoleConfigurations()
+        private static void ConfigureServices(IServiceCollection serviceCollection)
+        {
+            ServicesDependencyBinder.Bind(serviceCollection);
+            RepositoriesDependencyBinder.Bind(serviceCollection);
+
+            serviceCollection.AddSingleton<GamePacketHandlerAuth>();
+            serviceCollection.AddSingleton<AuthThread>();
+            serviceCollection.AddSingleton<PacketHandler>();
+            serviceCollection.AddSingleton<ServerThread>();
+
+            serviceCollection.AddSingleton<ServerThreadPool>();
+            serviceCollection.AddSingleton<GamePacketHandler>();
+            serviceCollection.AddSingleton<ClientManager>();
+            serviceCollection.AddSingleton<Managers.ClientManager>();
+            
+            serviceCollection.AddSingleton<PreReqValidation>();
+            serviceCollection.AddSingleton<Config.Config>();
+            serviceCollection.AddSingleton<LoginServer>();
+
+        }
+
+        private static void SetConsoleConfiguration()
         {
             Console.Title = @"L2dotNET LoginServer";
         }

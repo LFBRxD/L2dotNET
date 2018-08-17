@@ -3,138 +3,108 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using log4net;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts;
+using L2dotNET.Logging.Abstraction;
 using L2dotNET.LoginService.Model;
 using L2dotNET.LoginService.Network;
 using L2dotNET.Services.Contracts;
-using Ninject;
+using Mapster;
+using NLog;
 
 namespace L2dotNET.LoginService.GSCommunication
 {
     public class ServerThreadPool
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(ServerThreadPool));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        [Inject]
-        public IServerService ServerService => LoginServer.Kernel.Get<IServerService>();
+        public ICollection<L2Server> Servers { get; private set; }
 
-        private static volatile ServerThreadPool _instance;
-        private static readonly object SyncRoot = new object();
+        private readonly IServerService _serverService;
+        private readonly Config.Config _config;
+        private readonly PacketHandler _packetHandler;
         private TcpListener _listener;
 
-        public List<L2Server> Servers = new List<L2Server>();
-
-        public static ServerThreadPool Instance
+        public ServerThreadPool(IServerService serverService, Config.Config config, PacketHandler packetHandler)
         {
-            get
-            {
-                if (_instance != null)
-                    return _instance;
-
-                lock (SyncRoot)
-                {
-                    if (_instance == null)
-                        _instance = new ServerThreadPool();
-                }
-
-                return _instance;
-            }
+            _serverService = serverService;
+            _config = config;
+            _packetHandler = packetHandler;
         }
 
-        public void Initialize()
+        public async Task Initialize()
         {
-            Servers.AddRange(ServerService.GetServerList().Select(curServ => new L2Server
-            {
-                Id = (byte)curServ.Id,
-                Info = curServ.Name,
-                Code = curServ.Code
-            }).ToList());
+            IEnumerable<ServerContract> servers = await _serverService.GetServerList();
 
-            Log.Info($"GameServerThread: loaded {Servers.Count} servers");
+            Servers = servers.AsQueryable().ProjectToType<L2Server>().ToList();
+
+            Log.Info($"GameServerThread: loaded {Servers.Count()} servers");
         }
 
         public L2Server Get(short serverId)
         {
-            return Servers.FirstOrDefault(s => s.Id == serverId);
+            return Servers.FirstOrDefault(s => s.ServerId == serverId);
         }
-
-        protected TcpListener Listener;
 
         public void Start()
         {
-            //Listener = new TcpListener(IPAddress.Parse(Config.Config.Instance.ServerConfig.Host), Config.Config.Instance.ServerConfig.GsPort);
-            //Listener.Start();
-            //Log.Info($"Auth server listening gameservers at {Config.Config.Instance.ServerConfig.Host}:{Config.Config.Instance.ServerConfig.GsPort}");
-            //while (true)
-            //    VerifyClient(Listener.AcceptTcpClient());
-
-            _listener = new TcpListener(IPAddress.Parse(Config.Config.Instance.ServerConfig.Host), Config.Config.Instance.ServerConfig.GsPort);
+            _listener = new TcpListener(IPAddress.Parse(_config.ServerConfig.Host), _config.ServerConfig.GsPort);
 
             try
             {
                 _listener.Start();
-                Log.Info($"Auth server listening gameservers at { Config.Config.Instance.ServerConfig.Host}:{Config.Config.Instance.ServerConfig.GsPort}");
+                Log.Info($"Auth server listening gameservers at {_config.ServerConfig.Host}:{_config.ServerConfig.GsPort}");
             }
             catch (SocketException ex)
             {
-                Log.Error($"Socket Error: '{ex.SocketErrorCode}'. Message: '{ex.Message}' (Error Code: '{ex.NativeErrorCode}')");
-                Log.Info("Press ENTER to exit...");
-                Console.Read();
-                Environment.Exit(0);
+                Log.Halt($"Socket Error: '{ex.SocketErrorCode}'. Message: '{ex.Message}' (Error Code: '{ex.NativeErrorCode}')");
             }
 
-            WaitForClients();
+            Task.Factory.StartNew(WaitForClients);
         }
 
-        private void WaitForClients()
+        private async void WaitForClients()
         {
-            _listener.BeginAcceptTcpClient(OnClientConnected, null);
-        }
+            while (true)
+            {
+                TcpClient client = await _listener.AcceptTcpClientAsync();
+                Log.Info($"Received connection request from: {client.Client.RemoteEndPoint}");
 
-        private void OnClientConnected(IAsyncResult asyncResult)
-        {
-            TcpClient clientSocket = _listener.EndAcceptTcpClient(asyncResult);
+                ServerThread serverThread = new ServerThread(_packetHandler);
 
-            Log.Info($"Received connection request from: {clientSocket.Client.RemoteEndPoint}");
-
-            VerifyClient(clientSocket);
-
-            WaitForClients();
-        }
-
-        private void VerifyClient(TcpClient clientSocket)
-        {
-            ServerThread st = new ServerThread();
-            st.ReadData(clientSocket, this);
+                Task.Factory.StartNew(() => serverThread.ReadData(client, this));
+            }
         }
 
         public void Shutdown(byte id)
         {
-            L2Server server = Servers.FirstOrDefault(s => s.Id == id);
+            L2Server server = Servers.FirstOrDefault(s => s.ServerId == id);
 
             if (server == null)
+            {
                 return;
+            }
 
             server.Thread?.Stop();
             server.Thread = null;
             Log.Warn($"ServerThread: #{id} shutted down");
         }
 
-        public bool LoggedAlready(string account)
+        public bool LoggedAlready(int accountId)
         {
-            foreach (L2Server srv in Servers.Where(srv => (srv.Thread != null) && srv.Thread.LoggedAlready(account)))
+            foreach (L2Server srv in Servers.Where(srv => srv.Thread != null && srv.Thread.LoggedAlready(accountId)))
             {
-                srv.Thread.KickAccount(account);
+                srv.Thread.KickAccount(accountId);
                 return true;
             }
 
             return false;
         }
 
-        public void SendPlayer(byte serverId, LoginClient client, string time)
+        public void SendPlayer(byte serverId, LoginClient client)
         {
-            L2Server server = Servers.FirstOrDefault(srv => (srv.Id == serverId) && (srv.Thread != null));
-            server?.Thread.SendPlayer(client, time);
+            L2Server server = Servers.FirstOrDefault(srv => srv.ServerId == serverId && srv.Thread != null);
+            server?.Thread.SendPlayer(client);
         }
     }
 }

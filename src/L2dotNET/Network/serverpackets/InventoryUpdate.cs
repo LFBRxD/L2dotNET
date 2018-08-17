@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using L2dotNET.model.items;
+using L2dotNET.Models.Items;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -33,7 +33,7 @@ namespace L2dotNET.Network.serverpackets
 
                 L2Item item = (L2Item)obj[0];
 
-                WriteInt(item.ObjId);
+                WriteInt(item.ObjectId);
                 WriteInt(item.Template.ItemId);
                 WriteInt(item.SlotLocation); //loc
                 WriteLong(item.Count);
@@ -42,7 +42,7 @@ namespace L2dotNET.Network.serverpackets
                 WriteShort(item.CustomType1);
                 WriteShort(item.IsEquipped);
 
-                WriteInt(item.Template.BodyPart);
+                WriteInt((int) item.Template.BodyPart);
                 WriteShort(item.Enchant);
                 WriteShort(item.CustomType2);
 

@@ -1,14 +1,20 @@
-﻿using L2dotNET.Attributes;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Attributes;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Commands.Admin
 {
     [Command(CommandName = "chat")]
     class AdminChat : AAdminCommand
     {
-        protected internal override void Use(L2Player admin, string alias)
+        protected internal override async Task UseAsync(L2Player admin, string alias)
         {
-            admin.ShowHtmAdmin("main.htm", false);
+            await Task.FromResult(1);
+        }
+
+        public AdminChat(IServiceProvider serviceProvider) : base(serviceProvider)
+        {
         }
     }
 }

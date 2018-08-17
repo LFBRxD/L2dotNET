@@ -1,10 +1,16 @@
 using System.Collections.Generic;
 
-namespace L2dotNET.model.items
+namespace L2dotNET.Models.Items
 {
     public class CapsuleItem
     {
-        public int Id;
-        public List<CapsuleItemReward> Rewards = new List<CapsuleItemReward>();
+        public int Id { get; }
+        public ICollection<CapsuleItemReward> Rewards { get; }
+
+        public CapsuleItem(int id)
+        {
+            Id = id;
+            Rewards = new List<CapsuleItemReward>();
+        }
     }
 }

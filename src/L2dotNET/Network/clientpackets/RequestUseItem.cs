@@ -1,6 +1,9 @@
-﻿using L2dotNET.model.inventory;
-using L2dotNET.model.items;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Inventory;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 using L2dotNET.Plugins;
 
@@ -11,66 +14,68 @@ namespace L2dotNET.Network.clientpackets
         private readonly GameClient _client;
         private readonly int _sId;
 
-        public RequestUseItem(Packet packet, GameClient client)
+        public RequestUseItem(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _sId = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            if (player.PBlockAct == 1)
+            await Task.Run(() =>
             {
-                player.SendActionFailed();
-                return;
-            }
+                L2Player player = _client.CurrentPlayer;
 
-            L2Item item = player.GetItemByObjId(_sId);
-
-            if (item == null)
-            {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.IncorrectItem);
-                return;
-            }
-
-            if (player.TradeState != 0)
-            {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.CannotPickupOrUseItemWhileTrading);
-                player.SendActionFailed();
-                return;
-            }
-
-            if (item.IsEquipable())
-            {
-                if (!item.Equipped)
+                if (player.PBlockAct == 1)
                 {
-                    if (player.Inventory.Paperdoll[Inventory.GetPaperdollIndex(item.Template.BodyPart)] != null)
+                    player.SendActionFailedAsync();
+                    return;
+                }
+
+                L2Item item = player.GetItemByObjId(_sId);
+
+                if (item == null)
+                {
+                    player.SendSystemMessage(SystemMessageId.IncorrectItem);
+                    return;
+                }
+
+                if (player.TradeState != 0)
+                {
+                    player.SendSystemMessage(SystemMessageId.CannotPickupOrUseItemWhileTrading);
+                    player.SendActionFailedAsync();
+                    return;
+                }
+
+                if (item.IsEquipable())
+                {
+                    if (!item.Equipped)
                     {
-                        var equipped = player.Inventory.Paperdoll[Inventory.GetPaperdollIndex(item.Template.BodyPart)];
-                        equipped.Unequip(player);
+                        if (player.Inventory.Paperdoll[Inventory.GetPaperdollIndex((int) item.Template.BodyPart)] != null)
+                        {
+                            var equipped = player.Inventory.Paperdoll[Inventory.GetPaperdollIndex((int) item.Template.BodyPart)];
+                            equipped.Unequip(player);
+                        }
+                        player.Inventory.Paperdoll[Inventory.GetPaperdollIndex((int) item.Template.BodyPart)] = item;
+                        item.Equip(player);
+                        player.BroadcastUserInfoAsync();
+                        player.SendPacketAsync(new ItemList(player, true));
+                        foreach (IPlugin plugin in PluginManager.Instance.Plugins)
+                            plugin.OnItemEquip(player, item);
                     }
-                    player.Inventory.Paperdoll[Inventory.GetPaperdollIndex(item.Template.BodyPart)] = item;
-                    item.Equip(player);
-                    player.BroadcastUserInfo();
-                    player.SendPacket(new ItemList(player, true));
-                    foreach (IPlugin plugin in PluginManager.Instance.Plugins)
-                        plugin.OnItemEquip(player, item);
+                    else
+                    {
+                        player.Inventory.Paperdoll[Inventory.GetPaperdollIndex((int) item.Template.BodyPart)] = null;
+                        item.Unequip(player);
+                        player.BroadcastUserInfoAsync();
+                        player.SendPacketAsync(new ItemList(player, true));
+                    }
                 }
                 else
                 {
-                    player.Inventory.Paperdoll[Inventory.GetPaperdollIndex(item.Template.BodyPart)] = null;
-                    item.Unequip(player);
-                    player.BroadcastUserInfo();
-                    player.SendPacket(new ItemList(player, true));
+                    ItemHandler.Process(player, item);
                 }
-            }
-            else
-            {
-                ItemHandler.Instance.Process(player, item);
-            }
+            });
         }
-
     }
 }

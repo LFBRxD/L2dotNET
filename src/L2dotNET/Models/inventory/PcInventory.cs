@@ -1,18 +1,17 @@
-﻿using L2dotNET.model.items;
-using L2dotNET.model.player;
-using L2dotNET.world;
+﻿using L2dotNET.DataContracts;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Player;
+using L2dotNET.Services.Contracts;
+using L2dotNET.Tables;
 
-namespace L2dotNET.model.inventory
+namespace L2dotNET.Models.Inventory
 {
     public class PcInventory : Inventory
     {
-        public PcInventory(L2Character owner) : base(owner)
+        public PcInventory(L2Character owner)
+            : base(owner)
         {
-            Owner = owner;
         }
-
-        protected override L2Character Owner { get; set; }
-        protected override L2Item.ItemLocation BaseLocation { get; }
 
         public bool ReduceAdena(int count, L2Player player)
         {

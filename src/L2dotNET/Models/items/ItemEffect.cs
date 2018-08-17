@@ -1,13 +1,11 @@
-﻿using log4net;
-using L2dotNET.model.player;
-using L2dotNET.Network.serverpackets;
-using L2dotNET.world;
+﻿using L2dotNET.Models.Player;
+using NLog;
 
-namespace L2dotNET.model.items
+namespace L2dotNET.Models.Items
 {
     public class ItemEffect
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(ItemEffect));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public int[] Ids;
 
         public void Use(L2Character character, L2Item item)
@@ -23,7 +21,7 @@ namespace L2dotNET.model.items
 
         public virtual void UsePlayer(L2Player player, L2Item item)
         {
-            player.SendMessage("You cannot use this item.");
+            player.SendMessageAsync("You cannot use this item.");
         }
         
     }

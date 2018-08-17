@@ -1,53 +1,43 @@
-using System.Linq;
-using log4net;
+using System.Threading;
+using System.Threading.Tasks;
 using L2dotNET.Services.Contracts;
-using Ninject;
+using NLog;
 
-namespace L2dotNET.tables
+namespace L2dotNET.Tables
 {
-    sealed class IdFactory
+    public sealed class IdFactory : IInitialisable
     {
-        [Inject]
-        public IServerService ServerService => GameServer.Kernel.Get<IServerService>();
+        private readonly IItemService _itemService;
 
-        private static readonly ILog Log = LogManager.GetLogger(typeof(IdFactory));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
+        public bool Initialised { get; private set; }
 
-        private static volatile IdFactory _instance;
-        private static readonly object SyncRoot = new object();
-
-        public const int IdMin = 0x10000000,
-                         IdMax = 0x7FFFFFFF;
+        // TODO: Investigate the purpose of that
+        // public const int IdMin = 0x10000000;
+        // public const int IdMax = 0x7FFFFFFF;
 
         private int _currentId = 1;
 
-        public static IdFactory Instance
+        public IdFactory(IItemService itemService)
         {
-            get
-            {
-                if (_instance != null)
-                    return _instance;
-
-                lock (SyncRoot)
-                {
-                    if (_instance == null)
-                        _instance = new IdFactory();
-                }
-
-                return _instance;
-            }
+            _itemService = itemService;
         }
 
         public int NextId()
         {
-            _currentId++;
-            return _currentId;
+            return Interlocked.Increment(ref _currentId);
         }
 
-        public void Initialize()
+        public async Task Initialise()
         {
-            _currentId = ServerService.GetPlayersObjectIdList().DefaultIfEmpty(IdMin).Max();
+            if (Initialised)
+            {
+                return;
+            }
 
-            Log.Info($"idfactory: used ids {_currentId}.");
+            _currentId = _itemService.GetMaxItemId();
+            Log.Info($"Used IDs {_currentId}.");
+            Initialised = true;
         }
     }
 }

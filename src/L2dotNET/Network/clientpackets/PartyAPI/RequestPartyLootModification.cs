@@ -1,4 +1,6 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets.PartyAPI
 {
@@ -7,30 +9,33 @@ namespace L2dotNET.Network.clientpackets.PartyAPI
         private readonly GameClient _client;
         private readonly byte _mode;
 
-        public RequestPartyLootModification(Packet packet, GameClient client)
+        public RequestPartyLootModification(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             packet.MoveOffset(2);
             _client = client;
             _mode = packet.ReadByte();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            if (player.Party == null)
+            await Task.Run(() =>
             {
-                player.SendActionFailed();
-                return;
-            }
+                L2Player player = _client.CurrentPlayer;
 
-            if ((_mode < player.Party.ItemLooter) || (_mode > player.Party.ItemOrderSpoil) || (_mode == player.Party.ItemDistribution) || (player.Party.Leader.ObjId != player.ObjId))
-            {
-                player.SendActionFailed();
-                return;
-            }
+                if (player.Party == null)
+                {
+                    player.SendActionFailedAsync();
+                    return;
+                }
 
-            player.Party.VoteForLootChange(_mode);
+                if ((_mode < player.Party.ItemLooter) || (_mode > player.Party.ItemOrderSpoil) || (_mode == player.Party.ItemDistribution) || (player.Party.Leader.ObjectId != player.ObjectId))
+                {
+                    player.SendActionFailedAsync();
+                    return;
+                }
+
+                player.Party.VoteForLootChange(_mode);
+            });
         }
     }
 }

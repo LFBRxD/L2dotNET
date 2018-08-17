@@ -1,13 +1,16 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
 using L2dotNET.Controllers;
-using L2dotNET.managers;
-using L2dotNET.model.items;
-using L2dotNET.model.player;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Managers;
+using L2dotNET.Models.Items;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 using L2dotNET.Plugins;
 using L2dotNET.Services.Contracts;
-using L2dotNET.tables;
-using Ninject;
+using L2dotNET.World;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -15,80 +18,64 @@ namespace L2dotNET.Network.clientpackets
     {
         private readonly GameClient _client;
 
-        [Inject]
-        public IPlayerService PlayerService { get; set; } = GameServer.Kernel.Get<IPlayerService>();
+        private readonly ICharacterService CharacterService;
+        private readonly AnnouncementManager _announcementManager;
 
-        public EnterWorld(Packet packet, GameClient client)
+        public EnterWorld(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
+            _announcementManager = serviceProvider.GetService<AnnouncementManager>();
+            CharacterService = serviceProvider.GetService<ICharacterService>();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
             L2Player player = _client.CurrentPlayer;
 
             player.SetCharLastAccess();
-            PlayerService.UpdatePlayer(player);
+            CharacterService.UpdatePlayer(player);
 
             player.TotalRestore();
 
-            player.SendPacket(new SystemMessage(SystemMessage.SystemMessageId.WelcomeToLineage));
+            player.SendPacketAsync(new SystemMessage(SystemMessageId.WelcomeToLineage));
 
-            AnnouncementManager.Instance.OnEnter(player);
+            _announcementManager.OnEnter(player);
 
             foreach (L2Item item in player.Inventory.Items.Where(item => item.IsEquipped != 0))
                 item.NotifyStats(player);
-            
+
             // player.sendItemList(false);
-            player.SendPacket(new FriendList());
+            player.SendPacketAsync(new FriendList());
             player.SendQuestList();
             player.UpdateReuse();
 
-            player.SendPacket(new ExStorageMaxCount(player));
+            player.SendPacketAsync(new ExStorageMaxCount(player));
             // player.sendPacket(new ExBasicActionList());
             //  NpcTable.getInstance().spawnNpc("grandmaster_ramos", player.X, player.Y, player.Z, player.Heading);
-            player.SendActionFailed();
+            player.SendActionFailedAsync();
 
-            GameTime.Instance.EnterWorld(player);
+            GameTime.UpdateTimeForPlayer(player);
 
             player.Timer();
 
-            player.SpawnMe();
-            //L2WorldRegion worldRegion = L2World.Instance.GetRegion(player.X, player.Y);
+            player.SpawnMeAsync();
+            //L2WorldRegion worldRegion = L2World.GetRegion(player.X, player.Y);
             //player.SetRegion(worldRegion);
             //player.getKnowns(500, 500, false);
 
 
-            player.SetupKnows();
-            player.SendPacket(new UserInfo(player));
+            player.SetupKnowsAsync();
+            player.SendPacketAsync(new UserInfo(player));
 
             foreach (Plugin plugin in PluginManager.Instance.Plugins)
                 plugin.OnLogin(player);
 
             //player.sendPacket(new ShortCutInit(player));
             player.StartAi();
-            player.Status.StartHpMpRegeneration();
-            player.ShowHtm("servnews.htm",player);
-            player.BroadcastUserInfo();
+            player.CharStatus.StartHpMpRegeneration();
+            player.ShowHtm("servnews.htm", player);
+            player.BroadcastUserInfoAsync();
+            L2World.AddPlayer(player);
         }
-
-        //private int[][] _tracert = new int[5][];
-        //public override void Read()
-        //{
-        //    //readB(32);
-        //    //readD();
-        //    //readD();
-        //    //readD();
-        //    //readD();
-        //    //readB(32);
-        //    //readD();
-
-        //    //for (int i = 0; i < 5; i++)
-        //    //{
-        //    //    tracert[i] = new int[4];
-        //    //    for (int o = 0; o < 4; o++)
-        //    //        tracert[i][o] = packet.ReadByte();
-        //    //}
-        //}
     }
 }

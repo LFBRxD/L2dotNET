@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
-using L2dotNET.model.npcs;
-using L2dotNET.model.player;
-using L2dotNET.world;
+using L2dotNET.Models;
+using L2dotNET.Models.Npcs;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -30,7 +30,7 @@ namespace L2dotNET.Network.serverpackets
 
         public Die(L2Character cha)
         {
-            _sId = cha.ObjId;
+            _sId = cha.ObjectId;
 
             if (cha is L2Player)
                 DiePlayer((L2Player)cha);

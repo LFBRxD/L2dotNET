@@ -1,4 +1,6 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 using L2dotNET.Utility;
 
@@ -9,37 +11,40 @@ namespace L2dotNET.Network.clientpackets
         private readonly GameClient _client;
         private readonly string _link;
 
-        public RequestTutorialLinkHtml(Packet packet, GameClient client)
+        public RequestTutorialLinkHtml(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _link = packet.ReadString();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
+            await Task.Run(() =>
+            {
+                L2Player player = _client.CurrentPlayer;
 
-            if (_link.Contains(":"))
-            {
-                string[] link = _link.Split(':');
-                player.SendPacket(new TutorialShowHtml(player, link[0], link[1], player.ViewingAdminPage > 0));
-            }
-            else
-            {
-                if (_link.StartsWithIgnoreCase("tutorial_close_"))
-                    player.SendPacket(new TutorialCloseHtml());
+                if (_link.Contains(":"))
+                {
+                    string[] link = _link.Split(':');
+                    player.SendPacketAsync(new TutorialShowHtml(player, link[0], link[1], player.ViewingAdminPage > 0));
+                }
                 else
                 {
-                    if (_link.EqualsIgnoreCase("admin_close"))
-                    {
-                        player.SendPacket(new TutorialCloseHtml());
-                        player.ViewingAdminPage = 0;
-                        player.ViewingAdminTeleportGroup = -1;
-                    }
+                    if (_link.StartsWithIgnoreCase("tutorial_close_"))
+                        player.SendPacketAsync(new TutorialCloseHtml());
                     else
-                        player.SendPacket(new TutorialShowHtml(player, _link, player.ViewingAdminPage > 0));
+                    {
+                        if (_link.EqualsIgnoreCase("admin_close"))
+                        {
+                            player.SendPacketAsync(new TutorialCloseHtml());
+                            player.ViewingAdminPage = 0;
+                            player.ViewingAdminTeleportGroup = -1;
+                        }
+                        else
+                            player.SendPacketAsync(new TutorialShowHtml(player, _link, player.ViewingAdminPage > 0));
+                    }
                 }
-            }
+            });
         }
     }
 }

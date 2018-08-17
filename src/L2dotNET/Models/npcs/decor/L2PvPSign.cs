@@ -1,8 +1,9 @@
-﻿using L2dotNET.model.player;
+﻿using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
-using L2dotNET.templates;
+using L2dotNET.Templates;
 
-namespace L2dotNET.model.npcs.decor
+namespace L2dotNET.Models.Npcs.Decor
 {
     public class L2PvPSign : L2StaticObject
     {
@@ -10,14 +11,14 @@ namespace L2dotNET.model.npcs.decor
         {
         }
 
-        public override void NotifyAction(L2Player player)
+        public override async Task NotifyActionAsync(L2Player player)
         {
-            player.SendPacket(new NpcHtmlMessage(player, Htm, ObjId, 0));
+            await player.SendPacketAsync(new NpcHtmlMessage(player, Htm, ObjectId, 0));
         }
 
         public override string AsString()
         {
-            return $"L2PvP Sign:{ObjId} {StaticId}";
+            return $"L2PvP Sign:{ObjectId} {StaticId}";
         }
     }
 }

@@ -1,19 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using log4net;
-using L2dotNET.model.zones.forms;
+using L2dotNET.Models.Zones.forms;
+using L2dotNET.Utility;
+using NLog;
 
-namespace L2dotNET.tables
+namespace L2dotNET.Tables
 {
     public class L2Territory
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(L2Territory));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public string Name;
         public string Controller;
         public bool StartActive;
         public List<L2Spawn> Spawns = new List<L2Spawn>();
         public List<int[]> TerritoryLoc = new List<int[]>();
-        public Random Rnd = new Random();
         public ZoneNPoly Territory;
 
         public void AddNpc(int id, int count, string respawn, string pos)
@@ -90,8 +90,8 @@ namespace L2dotNET.tables
         {
             for (short a = 0; a < short.MaxValue; a++) //TODO FIX
             {
-                int rndx = Rnd.Next(Territory.minX, Territory.maxX);
-                int rndy = Rnd.Next(Territory.minY, Territory.maxY);
+                int rndx = RandomThreadSafe.Instance.Next(Territory.minX, Territory.maxX);
+                int rndy = RandomThreadSafe.Instance.Next(Territory.minY, Territory.maxY);
 
                 if (Territory.isInsideZone(rndx, rndy))
                     return new[] { rndx, rndy, Territory.getHighZ() };

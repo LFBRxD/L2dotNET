@@ -1,4 +1,7 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Network.clientpackets
@@ -7,40 +10,40 @@ namespace L2dotNET.Network.clientpackets
     {
         private readonly GameClient _client;
 
-        public RequestRestart(Packet packet, GameClient client)
+        public RequestRestart(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
             L2Player player = _client.CurrentPlayer;
 
             if (player == null)
+            {
                 return;
+            }
 
             if (player.PBlockAct == 1)
             {
-                player.SendActionFailed();
+                player.SendActionFailedAsync();
                 return;
             }
 
             if (player.isInCombat())
             {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.CantRestartWhileFighting);
-                player.SendActionFailed();
+                player.SendSystemMessage(SystemMessageId.CantRestartWhileFighting);
+                player.SendActionFailedAsync();
                 return;
             }
 
-            player.Online = 0;
-            player.DeleteMe();
-            player.SendPacket(new RestartResponse());
+            await _client.Disconnect();
+            player.SendPacketAsync(new RestartResponse());
 
-            CharacterSelectionInfo csl = new CharacterSelectionInfo(_client.AccountName, _client.AccountChars, _client.SessionKey.PlayOkId1)
-            {
-                CharId = player.ObjId
-            };
-            player.SendPacket(csl);
+            await _client.FetchAccountCharacters();
+
+            CharList csl = new CharList(_client, _client.SessionKey.PlayOkId1);
+            player.SendPacketAsync(csl);
         }
     }
 }

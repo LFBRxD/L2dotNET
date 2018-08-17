@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Linq;
-using L2dotNET.model.player;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
-using L2dotNET.tables;
-using L2dotNET.templates;
-using L2dotNET.world;
+using L2dotNET.Tables;
+using L2dotNET.Templates;
+using L2dotNET.Utility;
 
-namespace L2dotNET.model.npcs
+namespace L2dotNET.Models.Npcs
 {
     public class L2Warrior : L2Npc
     {
@@ -15,8 +16,9 @@ namespace L2dotNET.model.npcs
         public L2Spawn TerritorySpawn;
         public System.Timers.Timer socialTask;
 
-        public L2Warrior(int objectId, NpcTemplate template) : base(objectId, template)
+        public L2Warrior(SpawnTable spawnTable, int objectId, NpcTemplate template, L2Spawn spawn) : base(spawnTable, objectId, template, spawn)
         {
+
         }
 
         public override string AsString()
@@ -24,9 +26,9 @@ namespace L2dotNET.model.npcs
             return base.AsString().Replace("L2Npc", "L2Warrior");
         }
 
-        public override void OnAction(L2Player player)
+        public override async Task OnActionAsync(L2Player player)
         {
-            player.SendMessage(AsString());
+            await player.SendMessageAsync(AsString());
             //    TimeSpan ts = dtstart - DateTime.Now;
             //    player.sendMessage($"timems {(ts.TotalMilliseconds)}");
             bool newtarget = false;
@@ -37,7 +39,7 @@ namespace L2dotNET.model.npcs
             }
             else
             {
-                if (player.Target.ObjId != ObjId)
+                if (player.Target.ObjectId != ObjectId)
                 {
                     player.Target = this;
                     newtarget = true;
@@ -46,21 +48,19 @@ namespace L2dotNET.model.npcs
 
             if (newtarget)
             {
-                player.SendPacket(new MyTargetSelected(ObjId, player.Level - Template.Level));
+                await player.SendPacketAsync(new MyTargetSelected(ObjectId, player.Level - Template.Level));
 
                 StatusUpdate su = new StatusUpdate(this);
-                su.Add(StatusUpdate.CurHp, (int)CurHp);
+                su.Add(StatusUpdate.CurHp, (int)CharStatus.CurrentHp);
                 su.Add(StatusUpdate.MaxHp, (int)MaxHp);
-                player.SendPacket(su);
+                await player.SendPacketAsync(su);
             }
             
         }
 
-        private readonly Random _rnd = new Random();
-
-        public override void OnSpawn(bool notifyOthers = true)
+        public override async Task OnSpawnAsync(bool notifyOthers = true)
         {
-            base.OnSpawn(notifyOthers);
+            await base.OnSpawnAsync(notifyOthers);
 
             SpawnX = X;
             SpawnY = Y;
@@ -74,10 +74,10 @@ namespace L2dotNET.model.npcs
 
         private void SocialTask(object sender, System.Timers.ElapsedEventArgs e)
         {
-            if (CantMove() || IsAttacking())
+            if (!CharMovement.CanMove() || IsAttacking())
                 return;
 
-            MoveTo(_rnd.Next(SpawnX - 90, SpawnX + 90), _rnd.Next(SpawnY - 90, SpawnY + 90), Z);
+            CharMovement.MoveTo(RandomThreadSafe.Instance.Next(SpawnX - 90, SpawnX + 90), RandomThreadSafe.Instance.Next(SpawnY - 90, SpawnY + 90), Z);
 
             // broadcastPacket(new SocialAction(ObjID, rnd.Next(8)));
         }
@@ -86,27 +86,26 @@ namespace L2dotNET.model.npcs
         {
         }
 
-        public override void OnForcedAttack(L2Player player)
+        public override async Task OnForcedAttackAsync(L2Player player)
         {
-            player.AttackingId = ObjId;
+            await Task.Run(() =>
+            {
+                player.AttackingId = ObjectId;
+            });
         }
 
-        public override void BroadcastUserInfo()
+        public override async Task BroadcastUserInfoAsync()
         {
             foreach (L2Player obj in KnownObjects.Values.OfType<L2Player>())
-                obj.SendPacket(new NpcInfo(this));
+                await obj.SendPacketAsync(new NpcInfo(this));
         }
 
-        public override void DoDie(L2Character killer)
+        public override async Task DoDieAsync(L2Character killer)
         {
-            base.DoDie(killer);
+            await base.DoDieAsync(killer);
 
             if (killer is L2Player)
                 ((L2Player)killer).RedistExp(this);
-            else
-            {
-
-            }
 
             //Template.roll_drops(this, killer);
 
@@ -116,7 +115,7 @@ namespace L2dotNET.model.npcs
             //socialTask.Enabled = false;
         }
 
-        public override void OnActionShift(L2Player player)
+        public override async Task OnActionShiftAsync(L2Player player)
         {
             string text = string.Empty;
             //text += $"pdef: {CharacterStat.GetStat(EffectType.PPhysicalDefense)}<br>";
@@ -127,7 +126,7 @@ namespace L2dotNET.model.npcs
             //text += $"matk: {CharacterStat.GetStat(EffectType.PMagicalDefense)}<br>";
 
             player.ShowHtmPlain(text, null);
-            player.SendActionFailed();
+            await player.SendActionFailedAsync();
         }
 
         public override int Attackable => 1;

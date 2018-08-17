@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using L2dotNET.model.items;
+using L2dotNET.Models.Items;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -20,7 +20,7 @@ namespace L2dotNET.Network.serverpackets
 
             foreach (L2Item item in _list)
             {
-                WriteInt(item.ObjId);
+                WriteInt(item.ObjectId);
                 WriteInt(item.Template.ItemId);
                 WriteInt(0);
                 WriteLong(item.Count);
@@ -29,7 +29,7 @@ namespace L2dotNET.Network.serverpackets
                 WriteShort(0);
                 WriteShort(0);
 
-                WriteInt(item.Template.BodyPart);
+                WriteInt((int) item.Template.BodyPart);
                 WriteShort(item.Enchant);
                 WriteShort(0);
 

@@ -1,5 +1,5 @@
-﻿using L2dotNET.model.items.cursed;
-using L2dotNET.Network.serverpackets;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -7,17 +7,18 @@ namespace L2dotNET.Network.clientpackets
     {
         private readonly GameClient _client;
 
-        public RequestCursedWeaponList(Packet packet, GameClient client)
+        public RequestCursedWeaponList(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             packet.MoveOffset(2);
             _client = client;
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            int[] ids = CursedWeapons.GetInstance().GetWeaponIds();
+            await Task.FromResult(1);
+            //int[] ids = CursedWeapons.GetInstance().GetWeaponIds();
 
-            _client.SendPacket(new ExCursedWeaponList(ids));
+            //_client.SendPacket(new ExCursedWeaponList(ids));
         }
     }
 }

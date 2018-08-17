@@ -1,5 +1,6 @@
-﻿using System.Linq;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -8,16 +9,18 @@ namespace L2dotNET.Network.clientpackets
         private readonly GameClient _client;
         private readonly int _questId;
 
-        public RequestQuestAbort(Packet packet, GameClient client)
+        public RequestQuestAbort(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _questId = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-            
+            await Task.Run(() =>
+            {
+                L2Player player = _client.CurrentPlayer;
+            });
         }
     }
 }

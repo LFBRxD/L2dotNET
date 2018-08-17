@@ -2,7 +2,7 @@
 using L2dotNET.Enums;
 using L2dotNET.Utility;
 
-namespace L2dotNET.templates
+namespace L2dotNET.Templates
 {
     public class NpcTemplate : CharTemplate
     {
@@ -19,6 +19,8 @@ namespace L2dotNET.templates
         public int LHand { get; set; }
         public int EnchantEffect { get; set; }
         public int CorpseTime { get; set; }
+        public double Hp { get; set; }
+        public double Mp { get; set; }
 
         public int DropHerbGroup { get; set; }
         public Race race = Race.Unknown;
@@ -46,12 +48,15 @@ namespace L2dotNET.templates
 
         //private List<DropCategory> _categories;
         //private List<MinionData> _minions;
-        public List<ClassId> TeachInfo = new List<ClassId>();
+        public List<ClassId> TeachInfo { get; }
         //private Dictionary<int, L2Skill> _skills = new Dictionary<>();
         //private Dictionary<EventType, List<Quest>> _questEvents = new Dictionary<>();
 
         public NpcTemplate(StatsSet set) : base(set)
         {
+            //Refactor this
+            TeachInfo = new List<ClassId>();
+
             NpcId = set.GetInt("id");
             IdTemplate = set.GetInt("idTemplate", NpcId);
             Type = set.GetString("type");
@@ -65,11 +70,13 @@ namespace L2dotNET.templates
             LHand = set.GetInt("lHand");
             EnchantEffect = set.GetInt("enchant");
             CorpseTime = set.GetInt("corpseTime", 7);
+            Hp = set.GetDouble("hp");
+            Mp = set.GetDouble("mp");
 
             DropHerbGroup = set.GetInt("dropHerbGroup");
             //if (_dropHerbGroup > 0 && HerbDropTable.getInstance().getHerbDroplist(_dropHerbGroup) == null)
             //{
-            //    _log.warning($"Missing dropHerbGroup information for npcId: {_npcId}, dropHerbGroup: {_dropHerbGroup});
+            //    Log.warning($"Missing dropHerbGroup information for npcId: {_npcId}, dropHerbGroup: {_dropHerbGroup});
             //    _dropHerbGroup = 0;
             //}
 

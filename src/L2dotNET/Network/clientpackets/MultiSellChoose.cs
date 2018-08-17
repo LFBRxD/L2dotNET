@@ -1,6 +1,6 @@
-﻿using L2dotNET.model.player;
-using L2dotNET.Network.serverpackets;
-using L2dotNET.tables.multisell;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -14,7 +14,7 @@ namespace L2dotNET.Network.clientpackets
         private readonly int _unk2;
         private readonly int _unk3;
 
-        public MultiSellChoose(Packet packet, GameClient client)
+        public MultiSellChoose(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _listId = packet.ReadInt();
@@ -27,84 +27,12 @@ namespace L2dotNET.Network.clientpackets
             _unk3 = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            if (player.LastRequestedMultiSellId != _listId)
+            await Task.Run(() =>
             {
-                player.SendMessage("You are not authorized to use this list now.");
-                player.SendActionFailed();
-                return;
-            }
-
-            MultiSellList list;
-            if (player.CustomMultiSellList != null)
-            {
-                list = player.CustomMultiSellList;
-                if (list.Id != _listId)
-                    list = MultiSell.Instance.GetList(_listId);
-            }
-            else
-                list = MultiSell.Instance.GetList(_listId);
-
-            if ((list == null) || (list.Container.Count < _entryId))
-            {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.TradeAttemptFailed);
-                player.SendActionFailed();
-                return;
-            }
-
-            MultiSellEntry entry = list.Container[_entryId];
-
-            bool ok = true;
-            foreach (MultiSellItem i in entry.Take)
-            {
-                if (i.Id > 0)
-                {
-                    if (player.HasItem(i.Id, i.Count))
-                        continue;
-
-                    ok = false;
-                    break;
-                }
-
-                switch (i.Id)
-                {
-                    case -100: //pvppoint
-                        if (player.Fame < (i.Count * _amount))
-                            ok = false;
-                        break;
-                }
-            }
-
-            if (!ok)
-            {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.NotEnoughRequiredItems);
-                player.SendActionFailed();
-                return;
-            }
-
-            foreach (MultiSellItem i in entry.Take)
-            {
-                if (i.L2Item != null)
-                    player.DestroyItem(i.L2Item, 1);
-                else
-                {
-                    if (i.Id > 0)
-                        player.DestroyItemById(i.Id, i.Count);
-                    else
-                    {
-                        switch (i.Id)
-                        {
-                            case -100: //pvppoint
-                                break;
-                        }
-                    }
-                }
-            }
-
-            player.SendSystemMessage(SystemMessage.SystemMessageId.SuccessfullyTradedWithNpc);
+                L2Player player = _client.CurrentPlayer;
+            });
         }
     }
 }

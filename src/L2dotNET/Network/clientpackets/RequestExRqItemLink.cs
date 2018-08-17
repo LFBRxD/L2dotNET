@@ -1,6 +1,6 @@
-﻿using L2dotNET.managers;
-using L2dotNET.model.items;
-using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -9,16 +9,19 @@ namespace L2dotNET.Network.clientpackets
         private readonly GameClient _client;
         private readonly int _objectId;
 
-        public RequestExRqItemLink(Packet packet, GameClient client)
+        public RequestExRqItemLink(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             packet.MoveOffset(2);
             _client = client;
             _objectId = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
+            await Task.Run(() =>
+            {
+                L2Player player = _client.CurrentPlayer;
+            });
 
             //L2Item item = RqItemManager.GetInstance().GetItem(_objectId);
             //if (item == null)

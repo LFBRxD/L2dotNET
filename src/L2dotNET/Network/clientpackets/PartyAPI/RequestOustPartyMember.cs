@@ -1,4 +1,7 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
 
 namespace L2dotNET.Network.clientpackets.PartyAPI
@@ -8,30 +11,33 @@ namespace L2dotNET.Network.clientpackets.PartyAPI
         private readonly GameClient _client;
         private readonly string _name;
 
-        public RequestOustPartyMember(Packet packet, GameClient client)
+        public RequestOustPartyMember(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _name = packet.ReadString();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            if (player.Party == null)
+            await Task.Run(() =>
             {
-                player.SendActionFailed();
-                return;
-            }
+                L2Player player = _client.CurrentPlayer;
 
-            if (player.Party.Leader.ObjId != player.ObjId)
-            {
-                player.SendSystemMessage(SystemMessage.SystemMessageId.FailedToExpelThePartyMember);
-                player.SendActionFailed();
-                return;
-            }
+                if (player.Party == null)
+                {
+                    player.SendActionFailedAsync();
+                    return;
+                }
 
-            player.Party.Expel(_name);
+                if (player.Party.Leader.ObjectId != player.ObjectId)
+                {
+                    player.SendSystemMessage(SystemMessageId.FailedToExpelThePartyMember);
+                    player.SendActionFailedAsync();
+                    return;
+                }
+
+                player.Party.Expel(_name);
+            });
         }
     }
 }

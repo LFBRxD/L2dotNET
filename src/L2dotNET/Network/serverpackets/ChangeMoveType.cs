@@ -1,5 +1,5 @@
 ﻿using System;
-using L2dotNET.world;
+using L2dotNET.Models;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -13,7 +13,7 @@ namespace L2dotNET.Network.serverpackets
 
         public ChangeMoveType(L2Character character)
         {
-            _charObjId = character.ObjId;
+            _charObjId = character.ObjectId;
             _running = Convert.ToBoolean(character.IsRunning);
         }
 

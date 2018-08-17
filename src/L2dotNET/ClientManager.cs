@@ -1,85 +1,68 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.Sockets;
-using log4net;
 using L2dotNET.Network;
+using L2dotNET.Services.Contracts;
+using NLog;
 
 namespace L2dotNET
 {
-    class ClientManager
+    public class ClientManager
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof(ClientManager));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        private static volatile ClientManager instance;
-        private static readonly object syncRoot = new object();
+        private readonly ConcurrentDictionary<string, DateTime> _flood;
+        private readonly ConcurrentDictionary<string, GameClient> _loggedClients;
+        private readonly GamePacketHandler _gamePacketHandler;
 
-        public static ClientManager Instance
+        public ClientManager(GamePacketHandler gamePacketHandler)
         {
-            get
-            {
-                if (instance != null)
-                    return instance;
+            _gamePacketHandler = gamePacketHandler;
 
-                lock (syncRoot)
-                {
-                    if (instance == null)
-                        instance = new ClientManager();
-                }
-
-                return instance;
-            }
+            _flood = new ConcurrentDictionary<string, DateTime>();
+            _loggedClients = new ConcurrentDictionary<string, GameClient>();
         }
-
-        protected SortedList<string, DateTime> Flood = new SortedList<string, DateTime>();
-        protected NetworkBlock Banned;
-
-        public SortedList<string, GameClient> Clients = new SortedList<string, GameClient>();
 
         public void AddClient(TcpClient client)
         {
-            if (Banned == null)
-                Banned = NetworkBlock.Instance;
-
             string ip = client.Client.RemoteEndPoint.ToString().Split(':')[0];
 
-            lock (Flood)
+            if (_flood.ContainsKey(ip))
             {
-                if (Flood.ContainsKey(ip))
+                if (_flood[ip].CompareTo(DateTime.UtcNow) == 1)
                 {
-                    if (Flood[ip].CompareTo(DateTime.Now) == 1)
-                    {
-                        log.Warn($"Active flooder: {ip}");
-                        client.Close();
-                        return;
-                    }
-
-                    lock (Flood)
-                        Flood.Remove(ip);
+                    Log.Warn($"Active flooder: {ip}");
+                    client.Close();
+                    return;
                 }
+
+                DateTime oldDate;
+                _flood.TryRemove(ip, out oldDate);
             }
 
-            Flood.Add(ip, DateTime.Now.AddMilliseconds(3000));
+            _flood.AddOrUpdate(ip, DateTime.UtcNow.AddMilliseconds(3000), (a, b) => DateTime.UtcNow.AddMilliseconds(3000));
 
-            if (!Banned.Allowed(ip))
+            if (!NetworkBlock.Instance.Allowed(ip))
             {
                 client.Close();
-                log.Error($"NetworkBlock: connection attemp failed. {ip} banned.");
+                Log.Error($"NetworkBlock: connection attemp failed. IP: {ip} banned.");
                 return;
             }
 
-            GameClient gc = new GameClient(client);
+            GameClient gameClient = new GameClient(this, client, _gamePacketHandler);
 
-            lock (Clients)
-                Clients.Add(gc.Address.ToString(), gc);
-            log.Info($"NetController: {Clients.Count} active connections");
+            _loggedClients.TryAdd(gameClient.Address.ToString(), gameClient);
+
+            Log.Info($"{_loggedClients.Count} active connections");
         }
 
-        public void Terminate(string sock)
+        public void Disconnect(string sock)
         {
-            lock (Clients)
-                Clients.Remove(sock);
+            GameClient o;
+            _loggedClients.TryRemove(sock, out o);
 
-            log.Info($"NetController: {Clients.Count} active connections");
+            Log.Info($"{_loggedClients.Count} active connections");
         }
     }
 }

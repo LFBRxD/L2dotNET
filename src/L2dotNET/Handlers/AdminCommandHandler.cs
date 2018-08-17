@@ -1,46 +1,40 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using log4net;
+using System.Threading.Tasks;
 using L2dotNET.Attributes;
 using L2dotNET.Commands;
-using L2dotNET.model.player;
+using L2dotNET.Models.Player;
 using L2dotNET.Utility;
+using NLog;
 
 namespace L2dotNET.Handlers
 {
     public class AdminCommandHandler : IAdminCommandHandler
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(AdminCommandHandler));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         private readonly SortedList<string, AAdminCommand> _commands = new SortedList<string, AAdminCommand>();
+        public bool Initialised { get; private set; }
+        private readonly IServiceProvider _serviceProvider;
 
-        private static volatile AdminCommandHandler _instance;
-        private static readonly object SyncRoot = new object();
-
-        public static AdminCommandHandler Instance
+        public AdminCommandHandler(IServiceProvider serviceProvider)
         {
-            get
-            {
-                if (_instance != null)
-                    return _instance;
-
-                lock (SyncRoot)
-                {
-                    if (_instance == null)
-                        _instance = new AdminCommandHandler();
-                }
-
-                return _instance;
-            }
+            _serviceProvider = serviceProvider;
         }
 
-        public void Initialize()
+        public async Task Initialise()
         {
+            if (Initialised)
+            {
+                return;
+            }
+
             IEnumerable<Type> typelist = Utilz.GetTypesInNamespace(Assembly.GetExecutingAssembly(), "L2dotNET.Commands.Admin");
             foreach (Type t in typelist)
-                Register(Activator.CreateInstance(t));
+                Register(Activator.CreateInstance(t, _serviceProvider));
 
-            Log.Info($"AdminAccess: loaded {_commands.Count} commands.");
+            Log.Info($"Loaded {_commands.Count} commands.");
+            Initialised = true;
         }
 
         public void Request(L2Player admin, string alias)
@@ -51,19 +45,19 @@ namespace L2dotNET.Handlers
 
             if (!_commands.ContainsKey(cmd))
             {
-                admin.SendMessage($"Command {cmd} not exists.");
-                admin.SendActionFailed();
+                admin.SendMessageAsync($"Command {cmd} not exists.");
+                admin.SendActionFailedAsync();
                 return;
             }
 
             AAdminCommand processor = _commands[cmd];
             try
             {
-                processor.Use(admin, alias);
+                processor.UseAsync(admin, alias);
             }
             catch (Exception sss)
             {
-                admin.SendMessage("Probably syntax eror.");
+                admin.SendMessageAsync("Probably syntax eror.");
                 Log.Error(sss);
             }
         }

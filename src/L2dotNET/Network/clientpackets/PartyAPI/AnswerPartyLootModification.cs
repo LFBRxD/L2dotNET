@@ -1,4 +1,6 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets.PartyAPI
 {
@@ -7,24 +9,27 @@ namespace L2dotNET.Network.clientpackets.PartyAPI
         private readonly GameClient _client;
         private readonly byte _answer;
 
-        public AnswerPartyLootModification(Packet packet, GameClient client)
+        public AnswerPartyLootModification(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             packet.MoveOffset(2);
             _client = client;
             _answer = packet.ReadByte();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            if (player.Party == null)
+            await Task.Run(() =>
             {
-                player.SendActionFailed();
-                return;
-            }
+                L2Player player = _client.CurrentPlayer;
 
-            player.Party.AnswerLootVote(player, _answer);
+                if (player.Party == null)
+                {
+                    player.SendActionFailedAsync();
+                    return;
+                }
+
+                player.Party.AnswerLootVote(player, _answer);
+            });
         }
     }
 }

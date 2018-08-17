@@ -1,4 +1,5 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace L2dotNET.Network.clientpackets.ClanAPI
 {
@@ -6,14 +7,17 @@ namespace L2dotNET.Network.clientpackets.ClanAPI
     {
         private readonly GameClient _client;
 
-        public RequestWithdrawalPledge(Packet packet, GameClient client)
+        public RequestWithdrawalPledge(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
+            await Task.Run(() =>
+            {
+                var player = _client.CurrentPlayer;
+            });
         }
     }
 }

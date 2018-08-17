@@ -1,6 +1,6 @@
-﻿using L2dotNET.templates;
+﻿using L2dotNET.Templates;
 
-namespace L2dotNET.model.npcs.decor
+namespace L2dotNET.Models.Npcs.Decor
 {
     public sealed class L2Chair : L2StaticObject
     {
@@ -10,12 +10,12 @@ namespace L2dotNET.model.npcs.decor
         {
             Closed = 0;
             //MaxHp = 0;
-            CurHp = 0;
+            CharStatus.SetCurrentHp(0);
         }
 
         public override string AsString()
         {
-            return $"L2Chair:{ObjId} {StaticId}";
+            return $"L2Chair:{ObjectId} {StaticId}";
         }
     }
 }

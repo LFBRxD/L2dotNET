@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
-using L2dotNET.model.player;
+using L2dotNET.Models.Player;
 
-namespace L2dotNET.managers
+namespace L2dotNET.Managers
 {
     public class PartyRoomManager
     {
@@ -25,7 +25,7 @@ namespace L2dotNET.managers
                 MaxLevel = maxLevel,
                 LootDist = lootDist,
                 Title = roomTitle,
-                LeaderId = player.ObjId
+                LeaderId = player.ObjectId
             };
             IdFactory++;
             Rooms.Add(roomId, room);

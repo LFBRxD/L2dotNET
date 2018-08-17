@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using L2dotNET.world;
+using L2dotNET.Models;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -7,7 +7,7 @@ namespace L2dotNET.Network.serverpackets
     {
         public PartySpelled(L2Character character)
         {
-            _id = character.ObjId;
+            _id = character.ObjectId;
             _summonType = character.ObjectSummonType;
             _character = character;
         }

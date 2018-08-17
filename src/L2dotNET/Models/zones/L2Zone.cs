@@ -1,11 +1,12 @@
 ﻿using System.Collections.Generic;
 using System.Timers;
-using L2dotNET.model.player;
-using L2dotNET.model.zones.forms;
+using L2dotNET.Models.Player;
+using L2dotNET.Models.Zones.forms;
 using L2dotNET.Network;
-using L2dotNET.world;
+using L2dotNET.Tables;
+using L2dotNET.World;
 
-namespace L2dotNET.model.zones
+namespace L2dotNET.Models.Zones
 {
     public class L2Zone
     {
@@ -17,12 +18,14 @@ namespace L2dotNET.model.zones
         public int InstanceId = -1;
         public L2Object NpcCenter;
 
+        protected readonly IdFactory _idFactory;
+
         public SortedList<int, L2Object> ObjectsInside = new SortedList<int, L2Object>();
 
         public virtual void OnEnter(L2Object obj)
         {
-            if (!ObjectsInside.ContainsKey(obj.ObjId))
-                ObjectsInside.Add(obj.ObjId, obj);
+            if (!ObjectsInside.ContainsKey(obj.ObjectId))
+                ObjectsInside.Add(obj.ObjectId, obj);
         }
 
         public void BroadcastPacket(GameserverPacket pk)
@@ -30,7 +33,7 @@ namespace L2dotNET.model.zones
             foreach (L2Object obj in ObjectsInside.Values)
             {
                 if (obj is L2Player)
-                    ((L2Player)obj).SendPacket(pk);
+                    ((L2Player)obj).SendPacketAsync(pk);
                 else
                 {
                    
@@ -45,8 +48,8 @@ namespace L2dotNET.model.zones
 
             lock (ObjectsInside)
             {
-                if (ObjectsInside.ContainsKey(obj.ObjId))
-                    ObjectsInside.Remove(obj.ObjId);
+                if (ObjectsInside.ContainsKey(obj.ObjectId))
+                    ObjectsInside.Remove(obj.ObjectId);
             }
         }
 
@@ -74,6 +77,11 @@ namespace L2dotNET.model.zones
         public int[] CylinderCenter;
         public string Name;
 
+        protected L2Zone(IdFactory idFactory)
+        {
+            _idFactory = idFactory;
+        }
+
         public void SelfDestruct(int sec)
         {
             _selfDestruct = new Timer(sec * 1000);
@@ -92,7 +100,7 @@ namespace L2dotNET.model.zones
 
             ObjectsInside.Clear();
 
-            L2WorldRegion region = L2World.Instance.GetRegion(CylinderCenter[0], CylinderCenter[1]);
+            L2WorldRegion region = L2World.GetRegion(CylinderCenter[0], CylinderCenter[1]);
             if (region != null)
             {
                 // region._zoneManager.remZone(this);

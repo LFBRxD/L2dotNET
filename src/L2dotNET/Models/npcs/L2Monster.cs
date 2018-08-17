@@ -1,71 +1,105 @@
-﻿using L2dotNET.model.npcs;
-using L2dotNET.templates;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using L2dotNET.model.player;
+﻿using System.Threading.Tasks;
+using L2dotNET.Templates;
 using L2dotNET.Network.serverpackets;
-using log4net.Core;
-using log4net;
-using L2dotNET.world;
-using System.Timers;
-using L2dotNET.Models.Stats;
 
-namespace L2dotNET.Models.npcs
+using L2dotNET.World;
+using System.Timers;
+using L2dotNET.Models.Player;
+using L2dotNET.Tables;
+using NLog;
+
+namespace L2dotNET.Models.Npcs
 {
     class L2Monster : L2Npc
     {
-
-        private readonly ILog Log = LogManager.GetLogger(typeof(L2Monster));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private Timer CorpseTimer;
+        private SpawnTable _spawnTable;
+        public override int Attackable => 1;
 
-        public L2Monster(int objectId, NpcTemplate template) : base(objectId, template)
+        public L2Monster(SpawnTable spawnTable, int objectId, NpcTemplate template, L2Spawn spawn) : base(spawnTable, objectId, template, spawn)
         {
+            _spawnTable = spawnTable;
             Template = template;
             Name = template.Name;
             InitializeCharacterStatus();
-
-            Status.CurrentHp = Template.BaseHpMax(0);
-            Status.CurrentMp = Template.BaseMpMax(0);
+            CharStatus.SetCurrentHp(MaxHp);
+            CharStatus.SetCurrentMp(MaxMp);
             //Stats = new CharacterStat(this);
         }
 
-        public override void OnAction(L2Player player)
+        public override async Task OnActionAsync(L2Player player)
         {
-            if (player.Target != this) {
-                player.SetTarget(this);
-                player.SendPacket(new MyTargetSelected(ObjId, 0));
+            if (player.Target != this)
+            {
+                player.SetTargetAsync(this);
                 return;
             }
-            player.MoveTo(X, Y, Z);
-            player.SendPacket(new MoveToPawn(player, this, 150));
 
-            player.DoAttack(this);
+            await player.CharMovement.MoveTo(X, Y, Z);
+            await player.SendPacketAsync(new MoveToPawn(player, this, 150));
+
+            await player.DoAttackAsync(this);
         }
 
-        public override void DoDie(L2Character killer)
+        public override async Task OnForcedAttackAsync(L2Player player)
         {
+            if (player.Target != this)
+            {
+                player.SetTargetAsync(this);
+                return;
+            }
+
+            await player.CharMovement.MoveTo(X, Y, Z);
+            
+            await player.SendPacketAsync(new MoveToPawn(player, this, (int)player.CharMovement.DistanceToSquared(X,Y)));
+
+            await player.DoAttackAsync(this);
+        }
+
+        public override async Task DoDieAsync(L2Character killer)
+        {         
+            lock (this)
+            {
+                if (Dead)
+                    return;
+
+                CharStatus.SetCurrentHp(0);
+
+                Dead = true;
+            }
             //Check For Exp
-            if(killer is L2Player)
+            if (killer is L2Player)
             {
                 ((L2Player)killer).AddExpSp(this.Template.Exp, this.Template.Sp, true);
             }
+
+            Target = null;
+            await CharMovement.NotifyStopMove(true);
+
+            if (IsAttacking())
+                AbortAttack();
+
+            CharStatus.StopHpMpRegeneration();
+
+            await BroadcastPacketAsync(new Die(this));
+            _spawnTable.RegisterRespawn(spawn);
             if (Template.CorpseTime <= 0)
-            { return; }
+            {
+                return;
+            }
             CorpseTimer = new Timer(Template.CorpseTime * 1000);
             CorpseTimer.Elapsed += new ElapsedEventHandler(RemoveCorpse);
             CorpseTimer.Start();
         }
 
-        private void RemoveCorpse(object sender, ElapsedEventArgs e)
+        private async void RemoveCorpse(object sender, ElapsedEventArgs e)
         {
             CorpseTimer.Stop();
             CorpseTimer.Enabled = false;
-            BroadcastPacket(new DeleteObject(ObjId));
-            L2World.Instance.RemoveObject(this);
+            await BroadcastPacketAsync(new DeleteObject(ObjectId));
+            L2World.RemoveObject(this);
         }
     }
 }

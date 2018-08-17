@@ -1,4 +1,4 @@
-﻿using L2dotNET.model.items;
+﻿using L2dotNET.Models.Items;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -22,14 +22,14 @@ namespace L2dotNET.Network.serverpackets
             WriteShort(_action);
 
             WriteShort(_item.Template.Type1);
-            WriteInt(_item.ObjId);
+            WriteInt(_item.ObjectId);
             WriteInt(_item.Template.ItemId);
             WriteInt(_num);
 
             WriteShort(_item.Template.Type2);
             WriteShort(0);
 
-            WriteInt(_item.Template.BodyPart);
+            WriteInt((int) _item.Template.BodyPart);
             WriteShort(_item.Enchant);
             WriteShort(0x00); // ?
             WriteShort(0x00);

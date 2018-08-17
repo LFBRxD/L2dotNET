@@ -1,19 +1,19 @@
 ﻿using System;
-using log4net;
-using L2dotNET.world;
+using L2dotNET.World;
+using NLog;
 
-namespace L2dotNET.managers
+namespace L2dotNET.Managers
 {
     public class ZoneManager
     {
-        private static readonly ILog Log = LogManager.GetLogger(typeof(ZoneManager));
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private static volatile ZoneManager _instance;
         private static readonly object SyncRoot = new object();
 
         public void Initialize()
         {
-            L2WorldRegion[,] worldRegions = L2World.Instance.GetWorldRegions();
+            L2WorldRegion[,] worldRegions = L2World.GetWorldRegions();
 
             try
             {

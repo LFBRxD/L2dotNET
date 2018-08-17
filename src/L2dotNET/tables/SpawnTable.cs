@@ -1,53 +1,92 @@
 ﻿using System.Collections.Generic;
-using log4net;
 using L2dotNET.DataContracts;
-using L2dotNET.model.npcs;
-using L2dotNET.Models;
+using L2dotNET.Models.Npcs;
 using L2dotNET.Services.Contracts;
-using Ninject;
+using System.Linq;
+using System.Timers;
+using System;
+using System.Threading.Tasks;
+using NLog;
 
-namespace L2dotNET.tables
+namespace L2dotNET.Tables
 {
-    public class SpawnTable
+    public class SpawnTable : IInitialisable
     {
-        [Inject]
-        public IServerService ServerService => GameServer.Kernel.Get<IServerService>();
+        private readonly IServerService _serverService;
 
-        private static readonly ILog Log = LogManager.GetLogger(typeof(SpawnTable));
-        private static volatile SpawnTable _instance;
-        private static readonly object SyncRoot = new object();
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
+        private Timer RespawnTimerTask;
+        private readonly IdFactory _idFactory;
+        private readonly Config.Config _config;
+        public bool Initialised { get; private set; }
 
-        public static SpawnTable Instance
+        public SpawnTable(IServerService serverService, IdFactory idFactory, Config.Config config)
         {
-            get
+            _config = config;
+            _serverService = serverService;
+            _idFactory = idFactory;
+        }
+
+        public async Task Initialise()
+        {
+            if (Initialised)
             {
-                if (_instance != null)
-                    return _instance;
+                return;
+            }
+            
+            List<SpawnlistContract> spawnsList = (await _serverService.GetAllSpawns()).ToList();
 
-                lock (SyncRoot)
+            spawnsList.ForEach((spawn) =>
+            {
+                L2Spawn l2Spawn =
+                new L2Spawn(NpcTable.GetTemplate(spawn.TemplateId), _idFactory, this)
                 {
-                    if (_instance == null)
-                        _instance = new SpawnTable();
-                }
+                    Location = new SpawnLocation(spawn.LocX, spawn.LocY, spawn.LocZ, spawn.Heading, spawn.RespawnDelay)
+                };
+                l2Spawn.Spawn(false);
+                Spawns.Add(l2Spawn);
+            });
 
-                return _instance;
+            Log.Info($"Spawned {spawnsList.Count} npcs.");
+
+            if (_config.GameplayConfig.NpcConfig.Misc.AutoMobRespawn)
+            {
+                RespawnTimerTask = new Timer();
+                RespawnTimerTask.Elapsed += new ElapsedEventHandler(RespawnTimerTick);
+                RespawnTimerTask.Interval = 2000;
+                RespawnTimerTask.Start();
+
+                Log.Info($"Started RespawnTimerTask.");
+            }
+
+            Initialised = true;
+        }
+
+        private void RespawnTimerTick(object sender, ElapsedEventArgs e)
+        {
+            foreach (var kvp in RespawnDict.ToArray())
+            {
+                long elapsedTicks = DateTime.Now.Ticks - kvp.Value.Ticks;
+                TimeSpan elapsedSpan = new TimeSpan(elapsedTicks);
+                if (elapsedSpan.TotalMilliseconds >= kvp.Key.Location.RespawnDelay)
+                {
+                    kvp.Key.Spawn(true);
+                    DeRegisterRespawn(kvp.Key);
+                }
             }
         }
 
-        public void Initialize()
+        public void RegisterRespawn(L2Spawn spawn)
         {
-            List<SpawnlistContract> spawnsList = ServerService.GetAllSpawns();
-
-            spawnsList.ForEach(spawn => new L2Spawn(NpcTable.Instance.GetTemplate(spawn.TemplateId))
-                                   {
-                                       Location = new SpawnLocation(spawn.LocX, spawn.LocY, spawn.LocZ, spawn.Heading)
-                                   }
-                                   .Spawn(false));
-
-            Log.Info($"SpawnTable: Spawned: {spawnsList.Count} npcs.");
+            RespawnDict.Add(spawn,DateTime.Now);
         }
 
-        public readonly List<L2Spawn> Spawns = new List<L2Spawn>();
+        private void DeRegisterRespawn(L2Spawn spawn)
+        {
+            RespawnDict.Remove(spawn);
+        }
 
+        public readonly List<L2Spawn> Spawns = new List<L2Spawn>(50000);
+        private readonly Dictionary<L2Spawn,DateTime> RespawnDict = new Dictionary<L2Spawn, DateTime>();
     }
 }

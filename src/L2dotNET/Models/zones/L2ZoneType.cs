@@ -1,11 +1,10 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using L2dotNET.model.player;
-using L2dotNET.model.zones.forms;
+using L2dotNET.Models.Player;
+using L2dotNET.Models.Zones.forms;
 using L2dotNET.Network;
-using L2dotNET.world;
 
-namespace L2dotNET.model.zones
+namespace L2dotNET.Models.Zones
 {
     public abstract class L2ZoneType
     {
@@ -109,7 +108,7 @@ namespace L2dotNET.model.zones
                 return;
 
             foreach (L2Player character in CharacterList.OfType<L2Player>())
-                character.SendPacket(packet);
+                character.SendPacketAsync(packet);
         }
     }
 }

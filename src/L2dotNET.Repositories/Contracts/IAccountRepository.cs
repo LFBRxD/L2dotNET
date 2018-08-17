@@ -1,16 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System.Threading.Tasks;
 using L2dotNET.DataContracts;
 
 namespace L2dotNET.Repositories.Contracts
 {
     public interface IAccountRepository
     {
-        AccountContract GetAccountByLogin(string login);
-
-        AccountContract CreateAccount(string login, string password);
-
-        bool CheckIfAccountIsCorrect(string login, string password);
-
-        List<int> GetPlayerIdsListByAccountName(string login);
+        Task<AccountContract> GetAccountByLogin(string login);
     }
 }

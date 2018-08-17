@@ -1,5 +1,6 @@
-﻿using L2dotNET.model.player;
-using L2dotNET.Network.serverpackets;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models.Player;
 
 namespace L2dotNET.Network.clientpackets.RecipeAPI
 {
@@ -8,17 +9,18 @@ namespace L2dotNET.Network.clientpackets.RecipeAPI
         private readonly GameClient _client;
         private readonly int _type;
 
-        public RequestRecipeBookOpen(Packet packet, GameClient client)
+        public RequestRecipeBookOpen(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
             _type = packet.ReadInt();
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
-
-            player.SendPacket(new RecipeBookItemList(player, _type));
+            await Task.Run(() =>
+            {
+                L2Player player = _client.CurrentPlayer;
+            });
         }
     }
 }

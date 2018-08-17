@@ -1,4 +1,4 @@
-﻿using L2dotNET.world;
+﻿using L2dotNET.Models;
 
 namespace L2dotNET.Network.serverpackets
 {
@@ -11,7 +11,7 @@ namespace L2dotNET.Network.serverpackets
 
         public TargetUnselected(L2Object obj)
         {
-            _id = obj.ObjId;
+            _id = obj.ObjectId;
             _x = obj.X;
             _y = obj.Y;
             _z = obj.Z;

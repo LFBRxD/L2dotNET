@@ -1,6 +1,8 @@
-﻿using L2dotNET.model.player;
+﻿using System;
+using System.Threading.Tasks;
+using L2dotNET.Models;
+using L2dotNET.Models.Player;
 using L2dotNET.Network.serverpackets;
-using L2dotNET.world;
 
 namespace L2dotNET.Network.clientpackets
 {
@@ -8,20 +10,23 @@ namespace L2dotNET.Network.clientpackets
     {
         private readonly GameClient _client;
 
-        public RequestRecordInfo(Packet packet, GameClient client)
+        public RequestRecordInfo(IServiceProvider serviceProvider, Packet packet, GameClient client) : base(serviceProvider)
         {
             _client = client;
         }
 
-        public override void RunImpl()
+        public override async Task RunImpl()
         {
-            L2Player player = _client.CurrentPlayer;
+            await Task.Run(() =>
+            {
+                L2Player player = _client.CurrentPlayer;
 
-            player.SendPacket(new UserInfo(player));
-            player.SendPacket(new ExBrExtraUserInfo(player.ObjId, player.AbnormalBitMaskEvent));
+                player.SendPacketAsync(new UserInfo(player));
+                player.SendPacketAsync(new ExBrExtraUserInfo(player.ObjectId, player.AbnormalBitMaskEvent));
 
-            foreach (L2Object obj in player.KnownObjects.Values)
-                player.OnAddObject(obj, null, $"Player {player.Name} recording replay with your character.");
+                foreach (L2Object obj in player.KnownObjects.Values)
+                    player.OnAddObject(obj, null, $"Player {player.Name} recording replay with your character.");
+            });
         }
     }
 }

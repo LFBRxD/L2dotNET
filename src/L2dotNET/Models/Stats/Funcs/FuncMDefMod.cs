@@ -1,33 +1,36 @@
-﻿using L2dotNET.model.inventory;
-using L2dotNET.model.player;
-using L2dotNET.Models.player.basic;
+﻿using L2dotNET.DataContracts.Shared.Enums;
+using L2dotNET.Models.Player;
+using L2dotNET.Models.Player.Basic;
+using static L2dotNET.Models.Inventory.Inventory;
 
 namespace L2dotNET.Models.Stats.Funcs
 {
-    public class FuncMDefMod : Func
+    public class FuncMDefMod : StatFunction
     {
-        public FuncMDefMod() : base(Stats.MagicDefence, 0x20, null)
+        public static FuncMDefMod Instance = new FuncMDefMod();
+
+        private FuncMDefMod() : base(CharacterStatId.MagicDefence, 0x20)
         {
         }
 
 
-        public override void Calculate(Env env)
+        public override void Calculate(StatFunctionEnvironment statFuncEnv)
         {
-            if (env.Character is L2Player player)
+            if (statFuncEnv.Character is L2Player player)
             {
-                if (player.Inventory.GetPaperdollItem(Inventory.PaperdollLfinger) != null)
-                    env.SubValue(5);
-                if (player.Inventory.GetPaperdollItem(Inventory.PaperdollRfinger) != null)
-                    env.SubValue(5);
-                if (player.Inventory.GetPaperdollItem(Inventory.PaperdollLear) != null)
-                    env.SubValue(9);
-                if (player.Inventory.GetPaperdollItem(Inventory.PaperdollRear) != null)
-                    env.SubValue(9);
-                if (player.Inventory.GetPaperdollItem(Inventory.PaperdollNeck) != null)
-                    env.SubValue(13);
+                if (player.Inventory.GetPaperdollItem(PaperdollLfinger) != null)
+                    statFuncEnv.SubValue(5);
+                if (player.Inventory.GetPaperdollItem(PaperdollRfinger) != null)
+                    statFuncEnv.SubValue(5);
+                if (player.Inventory.GetPaperdollItem(PaperdollLear) != null)
+                    statFuncEnv.SubValue(9);
+                if (player.Inventory.GetPaperdollItem(PaperdollRear) != null)
+                    statFuncEnv.SubValue(9);
+                if (player.Inventory.GetPaperdollItem(PaperdollNeck) != null)
+                    statFuncEnv.SubValue(13);
             }
 
-            env.MulValue(Formulas.MenBonus[env.Character.Stats.Men] * env.Character.GetLevelMod());
+            statFuncEnv.MulValue(Formulas.MenBonus[statFuncEnv.Character.CharacterStat.Men] * statFuncEnv.Character.GetLevelMod());
         }
     }
 }
