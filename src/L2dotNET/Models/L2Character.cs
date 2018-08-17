@@ -535,6 +535,7 @@ namespace L2dotNET.Models
             }
 
             Attack atk = new Attack(this, target, ss, 5);
+            
 
             if (dual)
             {
